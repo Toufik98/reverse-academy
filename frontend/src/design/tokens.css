@@ -1,0 +1,119 @@
+/* ============================================================
+   Reverse Academy — Design Tokens
+   Single source of truth for all visual values.
+   Applied via CSS custom properties.
+   ============================================================ */
+
+:root,
+:root[data-theme='dark'] {
+	/* Backgrounds — warm ink, comfortable for long sessions */
+	--surface-0: #161618;
+	--surface-1: #1c1c1f;
+	--surface-2: #232326;
+	--surface-3: #2b2b2f;
+	--surface-subtle: #343438;
+
+	/* Text */
+	--text-primary: #edebe8;
+	--text-secondary: #a5a4a0;
+	--text-tertiary: #6d6c68;
+	--text-inverse: #161618;
+
+	/* Accent — Amber/Gold */
+	--accent: #d4a843;
+	--accent-hover: #e2bc5a;
+	--accent-muted: #d4a84320;
+	--accent-subtle: #d4a84310;
+	--accent-text: #f5d98a;
+
+	/* Semantic */
+	--success: #6b8f71;
+	--success-muted: #6b8f7115;
+	--error: #c4554d;
+	--error-muted: #c4554d15;
+	--info: #5b8fb9;
+	--info-muted: #5b8fb915;
+	--warning: #c49a4d;
+
+	/* Code syntax */
+	--code-bg: #1a1a1d;
+	--code-keyword: #c4a7e7;
+	--code-string: #a8c99c;
+	--code-function: #e2bc5a;
+	--code-comment: #5c5b58;
+	--code-type: #7daecc;
+
+	/* Typography scale (fluid) */
+	--text-xs: clamp(0.694rem, 0.66rem + 0.18vw, 0.8rem);
+	--text-sm: clamp(0.833rem, 0.79rem + 0.22vw, 0.96rem);
+	--text-base: clamp(1rem, 0.95rem + 0.25vw, 1.15rem);
+	--text-lg: clamp(1.2rem, 1.1rem + 0.5vw, 1.44rem);
+	--text-xl: clamp(1.44rem, 1.3rem + 0.7vw, 1.8rem);
+	--text-2xl: clamp(1.728rem, 1.5rem + 1.14vw, 2.25rem);
+	--text-3xl: clamp(2.074rem, 1.75rem + 1.62vw, 2.8rem);
+	--text-hero: clamp(2.488rem, 2rem + 2.44vw, 3.6rem);
+
+	/* Font families */
+	--font-display: 'Fraunces', Georgia, serif;
+	--font-heading: 'Fraunces', Georgia, serif;
+	--font-body: 'Satoshi', system-ui, sans-serif;
+	--font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+	/* Spacing */
+	--space-1: 0.25rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-5: 1.25rem;
+	--space-6: 1.5rem;
+	--space-8: 2rem;
+	--space-12: 3rem;
+	--space-16: 4rem;
+	--space-24: 6rem;
+	--space-32: 8rem;
+
+	/* Radii */
+	--radius-sm: 6px;
+	--radius-md: 10px;
+	--radius-lg: 16px;
+	--radius-xl: 24px;
+	--radius-full: 9999px;
+
+	/* Layout */
+	--max-width-reading: 680px;
+	--max-width-content: 1200px;
+}
+
+:root[data-theme='light'] {
+	--surface-0: #fafaf8;
+	--surface-1: #f2f1ee;
+	--surface-2: #ffffff;
+	--surface-3: #e8e7e4;
+	--surface-subtle: #d4d3d0;
+
+	--text-primary: #1a1a1d;
+	--text-secondary: #6b6a67;
+	--text-tertiary: #9b9a97;
+	--text-inverse: #fafaf8;
+
+	--accent: #b8892e;
+	--accent-hover: #a07825;
+	--accent-muted: #b8892e18;
+	--accent-subtle: #b8892e10;
+	--accent-text: #8a6820;
+
+	--success: #4a7050;
+	--success-muted: #4a705015;
+	--error: #a8403a;
+	--error-muted: #a8403a15;
+	--info: #3d6f94;
+	--info-muted: #3d6f9415;
+	--warning: #a07825;
+
+	--code-bg: #f0efec;
+	--code-keyword: #7c5db8;
+	--code-string: #4a7050;
+	--code-function: #a07825;
+	--code-comment: #9b9a97;
+	--code-type: #3d6f94;
+}

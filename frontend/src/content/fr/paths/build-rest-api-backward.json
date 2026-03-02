@@ -1,0 +1,276 @@
+{
+  "id": "build-rest-api-backward",
+  "slug": "build-rest-api-backward",
+  "title": "Construire une API REST — À l'Envers",
+  "domain": "web-dev",
+  "mode": "problem-first",
+  "difficulty": "intermediate",
+  "description": "Vous n'apprenez pas HTTP par la théorie — vous commencez par un endpoint cassé en production et remontez couche par couche : méthodes, middleware, routage, codes de statut, validation, authentification JWT, CORS, et le cycle requête/réponse TCP complet.",
+  "xpReward": 360,
+  "estimatedMinutes": 60,
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "Le POST Qui Tourne en Rond",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Ce endpoint POST Express doit créer un utilisateur et retourner le résultat. Mais il renvoie toujours un corps vide et le client reçoit undefined. Le gestionnaire de route est manquant un point critique.",
+        "code": "const express = require('express');\nconst app = express();\n\napp.use(express.json());\n\nconst users = [];\n\napp.post('/api/users', (req, res) => {\n  const { name, email } = req.body;\n  const newUser = { id: users.length + 1, name, email };\n  users.push(newUser);\n  console.log('Utilisateur créé:', newUser);\n  // BUG: Le client reçoit un objet vide !\n});\n\napp.listen(3000);",
+        "language": "javascript",
+        "hint": "Le gestionnaire ne renvoie jamais de réponse ! Ajoutez res.status(201).json(newUser). Le code 201 signifie 'Created' — sémantiquement correct pour une création de ressource.",
+        "expectedConcepts": ["http-response", "status-codes", "express-basics"],
+        "validationRegex": "res\\.(status|json|send)",
+        "expectedFix": "res.status(201).json(newUser);"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "Le Cycle Requête-Réponse HTTP",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Le Modèle Requête-Réponse\n\nHTTP est un protocole **requête-réponse**. Le client envoie une requête, le serveur **doit** envoyer exactement une réponse :\n\n```\nClient                          Serveur\n  │  POST /api/users HTTP/1.1    │\n  │  Content-Type: application/json\n  │  {\"name\": \"Alice\"}           │\n  │─────────────────────────────►│\n  │                              │ Traite la requête\n  │  HTTP/1.1 201 Created        │\n  │  {\"id\": 1, \"name\": \"Alice\"} │\n  │◄─────────────────────────────│\n```\n\nSi le serveur ne répond pas :\n- Le client attend (et finit par timeout)\n- La connexion reste ouverte (fuite de ressources)\n- Les requêtes suivantes sont bloquées\n\n### Anatomie d'une Requête HTTP\n\n```http\nPOST /api/users HTTP/1.1        ← Ligne de requête\nHost: api.example.com           ← En-têtes\nContent-Type: application/json\nAuthorization: Bearer eyJhb...\n                                ← Ligne vide (sépare en-têtes du corps)\n{\"name\": \"Alice\"}               ← Corps (optionnel)\n```\n\n### Anatomie d'une Réponse HTTP\n\n```http\nHTTP/1.1 201 Created            ← Ligne de statut\nContent-Type: application/json\nLocation: /api/users/1\n\n{\"id\": 1, \"name\": \"Alice\"}    ← Corps de réponse\n```",
+        "keyInsight": "HTTP est requête-réponse. Le serveur DOIT envoyer une réponse pour chaque requête. La réponse comprend un code de statut (201 Created), des en-têtes et un corps optionnel.",
+        "formula": null,
+        "expandableSections": []
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "DELETE Qui Supprime la Mauvaise Chose",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Le endpoint DELETE est censé supprimer UN utilisateur par ID. Mais il supprime TOUS les utilisateurs ! Le code mélange les méthodes HTTP et ne lit pas correctement le paramètre de route.",
+        "code": "app.delete('/api/users', (req, res) => {\n  const id = req.body.id;\n  // Vide le tableau entier !\n  users.length = 0;\n  res.json({ message: 'Supprimé' });\n});\n\n// Le client envoie: DELETE /api/users/42",
+        "language": "javascript",
+        "hint": "1. La route devrait être '/api/users/:id' pour capturer l'ID du paramètre d'URL. 2. Utilisez req.params.id (pas req.body — DELETE n'a typiquement pas de corps). 3. Trouvez et supprimez uniquement cet utilisateur.",
+        "expectedConcepts": ["http-methods", "route-parameters", "idempotency"],
+        "validationRegex": "/:id|req\\.params\\.id|req\\.params",
+        "expectedFix": "app.delete('/api/users/:id', (req, res) => {\n  const id = parseInt(req.params.id);\n  const index = users.findIndex(u => u.id === id);\n  if (index === -1) return res.status(404).json({ error: 'Non trouvé' });\n  users.splice(index, 1);\n  res.status(204).send();\n});"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "title": "Méthodes HTTP et Idempotence",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Les Méthodes HTTP\n\n| Méthode | Objectif | Corps | Idempotent | Sûr |\n|---------|----------|-------|------------|-----|\n| GET | Lire une ressource | Non | Oui | Oui |\n| POST | Créer une ressource | Oui | Non | Non |\n| PUT | Remplacer une ressource | Oui | Oui | Non |\n| PATCH | Mise à jour partielle | Oui | Non* | Non |\n| DELETE | Supprimer une ressource | Non | Oui | Non |\n\n### Idempotence\n\nUne opération est **idempotente** si la répéter produit le même résultat :\n\n```\nDELETE /users/42   → 204 (supprimé)\nDELETE /users/42   → 404 (déjà supprimé — même état résultant)\nDELETE /users/42   → 404 (encore le même état)\n```\n\nPourquoi c'est important ? Les réseaux sont instables. Si un client envoie DELETE et le réseau coupe, il réessaie. L'idempotence garantit que le réessai est sûr.\n\n### Paramètres de Route vs Query vs Body\n\n```\nGET  /api/users/42          → req.params.id = \"42\" (identifiant de ressource)\nGET  /api/users?role=admin   → req.query.role = \"admin\" (filtre/recherche)\nPOST /api/users              → req.body = { name, email } (données de création)\n```\n\n| Source | Utilisation | Accès Express |\n|--------|------------|---------------|\n| Paramètres d'URL (`:id`) | Identifier la ressource | `req.params.id` |\n| Query string (`?key=val`) | Filtrage, pagination, tri | `req.query.key` |\n| Corps de requête | Données de création/mise à jour | `req.body.field` |",
+        "keyInsight": "Les méthodes HTTP ne sont pas que des noms — GET est sûr (pas d'effets de bord), PUT/DELETE sont idempotents (peuvent être réessayés en sécurité). L'idempotence est essentielle pour la résilience réseau.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "PUT vs PATCH — la distinction subtile",
+            "content": "**PUT** remplace la ressource entière :\n```http\nPUT /api/users/42\n{\"id\": 42, \"name\": \"Alice\", \"email\": \"a@new.com\", \"role\": \"user\"}\n```\nSi vous omettez `role`, il est supprimé (remplacé par la valeur par défaut).\n\n**PATCH** modifie les champs spécifiés uniquement :\n```http\nPATCH /api/users/42\n{\"email\": \"a@new.com\"}\n```\nLes autres champs restent inchangés."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-5",
+      "order": 5,
+      "title": "Le Middleware Mangeur de Requêtes",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous ajoutez un middleware de logging. Après l'ajout, TOUTES les routes retournent un timeout — aucune réponse n'arrive jamais. Le middleware a un bug subtil mais fatal.",
+        "code": "// Middleware de logging\napp.use((req, res) => {\n  console.log(`${req.method} ${req.url}`);\n});\n\n// Cette route ne reçoit plus jamais de requêtes !\napp.get('/api/health', (req, res) => {\n  res.json({ status: 'ok' });\n});",
+        "language": "javascript",
+        "hint": "Le middleware ne passe pas au suivant ! Sans appeler next(), la chaîne de middleware s'arrête. Ajoutez le paramètre next et appelez next() après le logging.",
+        "expectedConcepts": ["middleware", "next-function", "middleware-chain"],
+        "validationRegex": "next\\(\\)|\\(req,\\s*res,\\s*next\\)",
+        "expectedFix": "app.use((req, res, next) => {\n  console.log(`${req.method} ${req.url}`);\n  next();\n});"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-6",
+      "order": 6,
+      "title": "Le Pipeline Middleware",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Middleware — Le Cœur d'Express\n\nLes fonctions middleware sont exécutées **séquentiellement** dans l'ordre de déclaration. Chacune peut :\n- Modifier `req` ou `res`\n- Terminer le cycle requête-réponse\n- Appeler `next()` pour passer au middleware suivant\n\n```\nRequête → [Auth] → [Logging] → [Validation] → [Route Handler] → Réponse\n              ↓\n         401 Unauthorized (termine ici si non authentifié)\n```\n\n### Types de Middleware\n\n```javascript\n// 1. Middleware d'application (s'exécute sur toutes les requêtes)\napp.use(express.json());  // Parse le JSON\napp.use(cors());          // Ajoute les en-têtes CORS\n\n// 2. Middleware de route (s'exécute sur des routes spécifiques)\napp.get('/api/admin/*', requireAdmin, (req, res) => { ... });\n\n// 3. Middleware d'erreur (4 paramètres — attrape les erreurs)\napp.use((err, req, res, next) => {\n  console.error(err.stack);\n  res.status(500).json({ error: 'Erreur interne du serveur' });\n});\n```\n\n### L'Ordre Compte !\n\n```javascript\n// ✓ CORRECT — le JSON est parsé avant la route\napp.use(express.json());\napp.post('/api/users', handler);\n\n// ✗ FAUX — req.body est undefined\napp.post('/api/users', handler);\napp.use(express.json());\n```",
+        "keyInsight": "Le middleware forme un pipeline : chaque fonction transforme la requête/réponse et appelle next() pour continuer. Oublier next() bloque tout. L'ordre de déclaration définit l'ordre d'exécution.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Implémentation real-world d'un middleware d'auth",
+            "content": "```javascript\nfunction authenticate(req, res, next) {\n  const token = req.headers.authorization?.split(' ')[1];\n  if (!token) {\n    return res.status(401).json({ error: 'Token manquant' });\n  }\n  try {\n    const payload = jwt.verify(token, SECRET);\n    req.user = payload;  // Attache les infos utilisateur à la requête\n    next();              // Continue vers le handler de route\n  } catch (err) {\n    return res.status(401).json({ error: 'Token invalide' });\n  }\n}\n\n// Utilisation :\napp.get('/api/profile', authenticate, (req, res) => {\n  res.json(req.user); // On sait que l'user est authentifié ici\n});\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-7",
+      "order": 7,
+      "title": "Le 200 Qui Ment",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Ce endpoint API retourne toujours 200 OK — même quand l'utilisateur n'a pas été trouvé, quand la validation échoue, ou quand le serveur crashe. Le frontend ne peut pas distinguer succès d'échec. Corrigez les codes de statut.",
+        "code": "app.get('/api/users/:id', async (req, res) => {\n  try {\n    const user = await db.findUser(req.params.id);\n    if (!user) {\n      return res.status(200).json({ error: 'Utilisateur non trouvé' });\n    }\n    res.status(200).json(user);\n  } catch (err) {\n    res.status(200).json({ error: 'Erreur de base de données' });\n  }\n});\n\napp.post('/api/users', async (req, res) => {\n  const { email } = req.body;\n  if (!email) {\n    return res.status(200).json({ error: 'Email requis' });\n  }\n  // ...\n});",
+        "language": "javascript",
+        "hint": "Utilisez les codes de statut HTTP corrects : 404 pour non trouvé, 400 pour entrée invalide, 500 pour erreur serveur. Les niveaux 2xx signifient succès, 4xx erreur client, 5xx erreur serveur.",
+        "expectedConcepts": ["status-codes", "error-responses", "http-semantics"],
+        "validationRegex": "status\\(404\\)|status\\(400\\)|status\\(500\\)",
+        "expectedFix": "404 pour non trouvé, 400 pour validation, 500 pour erreur serveur"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-8",
+      "order": 8,
+      "title": "Codes de Statut HTTP — La Langue du Web",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Codes de Statut HTTP\n\nLes codes de statut sont organisés par centaine :\n\n### 2xx — Succès\n\n| Code | Nom | Utilisation |\n|------|-----|-------------|\n| 200 | OK | GET/PATCH/PUT réussi |\n| 201 | Created | POST réussi (nouvelle ressource) |\n| 204 | No Content | DELETE réussi (pas de corps en réponse) |\n\n### 4xx — Erreur Client\n\n| Code | Nom | Utilisation |\n|------|-----|-------------|\n| 400 | Bad Request | Validation échouée, JSON malformé |\n| 401 | Unauthorized | Non authentifié (pas de token/token invalide) |\n| 403 | Forbidden | Authentifié mais pas autorisé |\n| 404 | Not Found | Ressource n'existe pas |\n| 409 | Conflict | Doublon (email déjà utilisé) |\n| 422 | Unprocessable Entity | Format valide mais sémantiquement incorrect |\n| 429 | Too Many Requests | Rate limit dépassé |\n\n### 5xx — Erreur Serveur\n\n| Code | Nom | Utilisation |\n|------|-----|-------------|\n| 500 | Internal Server Error | Bug serveur non géré |\n| 502 | Bad Gateway | Service en amont indisponible |\n| 503 | Service Unavailable | Serveur surchargé ou en maintenance |\n\n### Pourquoi C'est Important\n\nLes codes corrects permettent :\n- **Logique côté client** : Réessayer sur 503, pas sur 400\n- **Caching** : Les proxies mettent en cache les 200, pas les 500\n- **Monitoring** : Les alertes se déclenchent sur les taux de 5xx\n- **SEO** : Les moteurs de recherche comprennent 301 (redirection) et 410 (supprimé)",
+        "keyInsight": "Les codes de statut HTTP sont sémantiques : 2xx = succès, 4xx = erreur client, 5xx = erreur serveur. Retourner 200 pour les erreurs casse les clients, le monitoring et les proxies. Utilisez le code le plus spécifique applicable.",
+        "formula": null,
+        "expandableSections": []
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-9",
+      "order": 9,
+      "title": "L'Injection par l'Input",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Le endpoint de création d'utilisateur ne valide rien — un utilisateur malveillant peut envoyer n'importe quel JSON et corrompre la base de données. Ajoutez la validation avec Zod.",
+        "code": "app.post('/api/users', async (req, res) => {\n  // Aucune validation ! Le client peut envoyer n'importe quoi\n  const user = {\n    id: generateId(),\n    ...req.body  // Injection directe du body entier !\n  };\n  await db.insert('users', user);\n  res.status(201).json(user);\n});\n\n// Requête malveillante :\n// { \"name\": \"Alice\", \"role\": \"admin\", \"__proto__\": { \"isAdmin\": true } }",
+        "language": "javascript",
+        "hint": "Utilisez une bibliothèque de validation (Zod, Joi). Définissez un schéma qui accepte uniquement les champs attendus. Parsez le body à travers le schéma — les champs non reconnus sont supprimés.",
+        "expectedConcepts": ["input-validation", "schema-validation", "security"],
+        "validationRegex": "z\\.object|schema\\.parse|schema\\.safeParse|Joi\\.object|validate",
+        "expectedFix": "const createUserSchema = z.object({\n  name: z.string().min(1).max(100),\n  email: z.string().email(),\n});\nconst data = createUserSchema.parse(req.body);"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-10",
+      "order": 10,
+      "title": "Validation d'Input — La Frontière de Confiance",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## La Frontière de Confiance\n\nToute donnée venant de l'extérieur est **non fiable** : corps de requête, query params, en-têtes, cookies, uploads.\n\n### Règle Fondamentale\n\n> Ne jamais faire confiance au client. Valider TOUT à la frontière du serveur.\n\n### Validation avec Zod\n\n```javascript\nimport { z } from 'zod';\n\nconst createUserSchema = z.object({\n  name: z.string().min(1).max(100).trim(),\n  email: z.string().email(),\n  age: z.number().int().min(13).max(150).optional(),\n});\n\n// safeParse ne lance pas — retourne success/error\nconst result = createUserSchema.safeParse(req.body);\nif (!result.success) {\n  return res.status(400).json({\n    error: 'Validation échouée',\n    details: result.error.issues,\n  });\n}\n\n// result.data contient UNIQUEMENT les champs validés\nconst user = result.data; // { name: string, email: string, age?: number }\n```\n\n### Attaques Prévenues par la Validation\n\n| Attaque | Prévention |\n|---------|------------|\n| Mass assignment (`role: admin` injecté) | Le schéma supprime les champs inconnus |\n| Prototype pollution (`__proto__`) | Le parsing crée un objet propre |\n| XSS via les champs texte | Sanitiser + encoder en sortie |\n| SQL injection | Requêtes paramétrées (validation seule ne suffit pas) |\n| Dépassement de taille | `z.string().max(1000)` |",
+        "keyInsight": "La validation d'input est votre barrière de sécurité #1. Utilisez un schéma (Zod, Joi) pour accepter uniquement les champs attendus avec les bons types. safeParse() retourne un objet propre — les champs inconnus sont éliminés.",
+        "formula": null,
+        "expandableSections": []
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-11",
+      "order": 11,
+      "title": "Le Token Qui Ment",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Le middleware d'authentification vérifie le JWT mais ne gère pas correctement les cas limites — tokens expirés, tokens avec un mauvais secret, et l'en-tête Authorization absent. Corrigez les 3 failles.",
+        "code": "const jwt = require('jsonwebtoken');\n\nfunction authenticate(req, res, next) {\n  const token = req.headers.authorization;\n  const decoded = jwt.verify(token, 'secret123');\n  req.user = decoded;\n  next();\n}",
+        "language": "javascript",
+        "hint": "3 problèmes : 1) Le token inclut 'Bearer ' qu'il faut enlever. 2) jwt.verify lance une exception si le token est invalide/expiré — il faut un try/catch. 3) Secret en dur — utiliser une variable d'environnement.",
+        "expectedConcepts": ["jwt", "authentication", "bearer-tokens"],
+        "validationRegex": "try\\s*\\{|split\\(|process\\.env",
+        "expectedFix": "function authenticate(req, res, next) {\n  const authHeader = req.headers.authorization;\n  if (!authHeader?.startsWith('Bearer ')) {\n    return res.status(401).json({ error: 'Token manquant' });\n  }\n  const token = authHeader.split(' ')[1];\n  try {\n    const decoded = jwt.verify(token, process.env.JWT_SECRET);\n    req.user = decoded;\n    next();\n  } catch (err) {\n    return res.status(401).json({ error: 'Token invalide' });\n  }\n}"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-12",
+      "order": 12,
+      "title": "Authentification — JWT et Sessions",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## JSON Web Tokens (JWT)\n\nJWT est un format de token auto-contenu : le serveur n'a pas besoin de base de données pour vérifier l'identité.\n\n### Structure du JWT\n\n```\neyJhbGci.eyJzdWIi.SflKxwRJ\n└ Header ┘└ Payload ┘└ Signature ┘\n```\n\n- **Header** : Algorithme de signature (HS256, RS256)\n- **Payload** : Données (user_id, rôle, expiration)\n- **Signature** : `HMAC(header + payload, secret)`\n\n### Le Flow d'Authentification\n\n```\n1. POST /auth/login  { email, password }\n2. Serveur vérifie → crée JWT → renvoie le token\n3. Client stocke le token (cookie httpOnly ou mémoire)\n4. Client envoie: Authorization: Bearer eyJhb...\n5. Serveur vérifie la signature → extrait l'identité\n```\n\n### JWT vs Sessions\n\n| | JWT | Session |\n|---|-----|--------|\n| Stockage serveur | Aucun (stateless) | Oui (Redis/DB) |\n| Scalabilité | Excellente | Requiert partage de session |\n| Révocation | Difficile (attendre l'expiration) | Facile (supprimer la session) |\n| Taille | ~500 bytes dans chaque requête | ~32 bytes (session ID) |\n\n### Bonnes Pratiques JWT\n\n1. **Durée courte** : 15 min access token + refresh token long\n2. **httpOnly cookies** : Pas accessible par JavaScript (anti-XSS)\n3. **Secret fort** : 256+ bits, depuis une variable d'environnement\n4. **Vérifier l'expiration** : `jwt.verify()` le fait automatiquement",
+        "keyInsight": "JWT est un token auto-vérifié (pas besoin de DB). Il contient header + payload + signature. Toujours vérifier avec try/catch, utiliser des secrets d'environnement, et des cookies httpOnly. Les sessions sont plus simples à révoquer mais moins scalables.",
+        "formula": null,
+        "expandableSections": []
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-13",
+      "order": 13,
+      "title": "Le Navigateur Qui Bloque Tout",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Votre frontend (localhost:3000) appelle votre API (localhost:8080). Le navigateur bloque la requête avec 'CORS error'. L'API fonctionne parfaitement depuis Postman. Pourquoi le navigateur bloque et comment le corriger ?",
+        "code": "// Frontend (localhost:3000)\nconst res = await fetch('http://localhost:8080/api/users', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ name: 'Alice' })\n});\n// Erreur: Access to fetch at 'http://localhost:8080/api/users'\n// from origin 'http://localhost:3000' has been blocked by CORS policy\n\n// Backend (localhost:8080)\nconst app = express();\napp.use(express.json());\napp.post('/api/users', (req, res) => {\n  res.status(201).json({ id: 1, name: req.body.name });\n});",
+        "language": "javascript",
+        "hint": "Ajoutez le middleware CORS au backend : app.use(cors({ origin: 'http://localhost:3000' })). CORS est une sécurité du navigateur — le serveur doit explicitement autoriser les requêtes cross-origin.",
+        "expectedConcepts": ["cors", "same-origin-policy", "preflight-requests"],
+        "validationRegex": "cors\\(|Access-Control-Allow|setHeader.*origin",
+        "expectedFix": "app.use(cors({ origin: 'http://localhost:3000' }));"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-14",
+      "order": 14,
+      "title": "CORS — Pourquoi le Navigateur Bloque",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Same-Origin Policy\n\nLes navigateurs interdisent aux pages web de faire des requêtes vers un domaine différent de celui qui a servi la page. C'est la **Same-Origin Policy** (politique de même origine).\n\nDeux URLs ont la même origine si et seulement si :\n- Même **protocole** (http vs https)\n- Même **hôte** (api.example.com vs example.com)\n- Même **port** (:3000 vs :8080)\n\n### Cross-Origin Resource Sharing (CORS)\n\nCORS est un mécanisme qui permet au serveur de déclarer : « J'autorise les requêtes depuis cette origine ».\n\n### La Requête Preflight\n\nPour les requêtes « non simples » (POST avec JSON, requêtes avec Authorization), le navigateur envoie d'abord un **OPTIONS** :\n\n```\n1. Browser → OPTIONS /api/users (demande la permission)\n   Access-Control-Request-Method: POST\n   Access-Control-Request-Headers: Content-Type, Authorization\n\n2. Server → 204\n   Access-Control-Allow-Origin: http://localhost:3000\n   Access-Control-Allow-Methods: GET, POST, PUT, DELETE\n   Access-Control-Allow-Headers: Content-Type, Authorization\n\n3. Browser → POST /api/users (vraie requête, permission accordée)\n```\n\n### Configuration CORS Sécurisée\n\n```javascript\nconst corsOptions = {\n  origin: ['https://app.example.com'],  // Jamais '*' en production\n  methods: ['GET', 'POST', 'PUT', 'DELETE'],\n  allowedHeaders: ['Content-Type', 'Authorization'],\n  credentials: true,  // Pour les cookies\n  maxAge: 86400,  // Cache preflight 24h\n};\napp.use(cors(corsOptions));\n```",
+        "keyInsight": "CORS est une protection du navigateur, pas du serveur. Le serveur déclare quelles origines sont autorisées via des en-têtes. Le navigateur envoie un preflight OPTIONS pour les requêtes non simples. Postman n'est pas un navigateur — il ignore CORS.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Pourquoi CORS existe — une histoire de sécurité",
+            "content": "Sans Same-Origin Policy, un site malveillant pourrait :\n\n1. Vous faire visiter `evil.com`\n2. Le JavaScript de `evil.com` fait : `fetch('https://bank.com/api/transfer', { credentials: 'include' })`\n3. Votre cookie de session bancaire est envoyé automatiquement\n4. L'argent est transféré !\n\nSame-Origin bloque l'étape 2. CORS permet au serveur bancaire d'autoriser son propre frontend (`bank.com`) sans autoriser `evil.com`."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-15",
+      "order": 15,
+      "title": "L'Erreur Qui Crashe le Serveur",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Quand la base de données est indisponible, votre serveur Express crashe entièrement — pas juste la requête, le processus entier s'arrête. Le serveur doit retourner une erreur 500, pas crasher.",
+        "code": "app.get('/api/users/:id', async (req, res) => {\n  const user = await db.findUser(req.params.id);\n  // Si db.findUser lance une exception,\n  // Express ne la rattrape pas automatiquement pour les async handlers !\n  res.json(user);\n});\n\napp.post('/api/users', async (req, res) => {\n  const user = await db.createUser(req.body);\n  res.status(201).json(user);\n});\n\n// Middlewared'erreur (ne reçoit jamais les erreurs async !)\napp.use((err, req, res, next) => {\n  console.error(err);\n  res.status(500).json({ error: 'Internal server error' });\n});",
+        "language": "javascript",
+        "hint": "Express < 5 ne gère pas automatiquement les rejets de promesse dans les handlers async. Enveloppez avec try/catch, ou utilisez un wrapper : const asyncHandler = fn => (req, res, next) => fn(req, res, next).catch(next);",
+        "expectedConcepts": ["error-handling", "async-errors", "express-error-middleware"],
+        "validationRegex": "try\\s*\\{|catch\\(|asyncHandler|\\.catch\\(next\\)",
+        "expectedFix": "const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);\n\napp.get('/api/users/:id', asyncHandler(async (req, res) => {\n  const user = await db.findUser(req.params.id);\n  if (!user) return res.status(404).json({ error: 'Non trouvé' });\n  res.json(user);\n}));"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-16",
+      "order": 16,
+      "title": "Le Voyage Complet — De TCP à l'API",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Le Voyage Complet d'une Requête API\n\n```\nClient (navigateur, mobile, curl)\n  │\n  ▼ 1. Résolution DNS : api.example.com → 93.184.216.34\n  │\n  ▼ 2. Connexion TCP (3-way handshake)\n  │    SYN → SYN-ACK → ACK\n  │\n  ▼ 3. TLS Handshake (si HTTPS)\n  │    Échange de certificats et clés\n  │\n  ▼ 4. Requête HTTP envoyée\n  │    POST /api/users HTTP/1.1\n  │    Authorization: Bearer eyJ...\n  │    {\"name\": \"Alice\"}\n  │\n  ▼ 5. Reverse Proxy (Nginx)\n  │    Rate limiting, TLS termination\n  │    → Forward vers le serveur app\n  │\n  ▼ 6. Pipeline Middleware Express\n  │    CORS → Body Parser → Auth → Logger\n  │\n  ▼ 7. Route Handler\n  │    Validation → Logique métier → DB\n  │\n  ▼ 8. Réponse HTTP\n  │    201 Created\n  │    {\"id\": 1, \"name\": \"Alice\"}\n  │\n  ▼ 9. La réponse remonte les mêmes couches\n```\n\n### Ce Que Vous Avez Appris\n\n| Couche | Concept | Erreur Corrigée |\n|--------|---------|----------------|\n| Réponse | Cycle requête-réponse | Le POST silencieux |\n| Méthodes | GET/POST/PUT/DELETE, idempotence | Le DELETE qui détruit tout |\n| Middleware | Pipeline next() | Le middleware mangeur |\n| Statut | 2xx/4xx/5xx sémantiques | Le 200 menteur |\n| Validation | Frontière de confiance, Zod | L'injection par l'input |\n| Auth | JWT, Bearer tokens | Le token qui ment |\n| CORS | Same-origin, preflight | Le navigateur qui bloque |\n| Erreurs | async/await, middleware d'erreur | Le crash du serveur |\n\n### Principe Directeur\n\n> Chaque couche du stack HTTP existe pour résoudre un problème de fiabilité, sécurité ou interopérabilité. Comprendre **pourquoi** chaque couche existe vous rend un meilleur développeur d'API.",
+        "keyInsight": "Une requête API traverse DNS → TCP → TLS → HTTP → Proxy → Middleware → Route → DB → Réponse. Chaque couche existe parce qu'un problème réel l'a rendue nécessaire. Vous avez remonté ce chemin en partant des bugs.",
+        "formula": null,
+        "expandableSections": []
+      },
+      "xpReward": 10
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "programming",
+    "name": "Programming",
+    "description": "Core programming concepts — types, algorithms, data structures, paradigms.",
+    "icon": "code-2",
+    "pathCount": 3
+  },
+  {
+    "id": "web-dev",
+    "name": "Web Development",
+    "description": "HTTP, APIs, frontend frameworks, backend architecture, deployment.",
+    "icon": "globe",
+    "pathCount": 1
+  },
+  {
+    "id": "systems",
+    "name": "Systems",
+    "description": "Operating systems, networking, databases, infrastructure.",
+    "icon": "cpu",
+    "pathCount": 1
+  },
+  {
+    "id": "stem",
+    "name": "STEM",
+    "description": "Mathematics, physics, and applied science through code.",
+    "icon": "calculator",
+    "pathCount": 0
+  }
+]

@@ -1,0 +1,265 @@
+{
+  "id": "python-debug-the-pipeline",
+  "slug": "python-debug-the-pipeline",
+  "title": "Python : Débuggez le Pipeline de Données",
+  "domain": "programming",
+  "mode": "fix-broken",
+  "difficulty": "intermediate",
+  "description": "Python est facile à apprendre, difficile à maîtriser. Débuggez 7 scripts de traitement de données cassés — chacun cache un piège subtil de Python : arguments mutables par défaut, copies superficielles, pièges de portée, générateurs épuisés, mensonges du virgule flottante, et plus. Chaque correction révèle un concept que la plupart des développeurs Python apprennent à leurs dépens.",
+  "xpReward": 340,
+  "estimatedMinutes": 50,
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "L'Argument par Défaut Hanté",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Cette fonction ajoute un utilisateur à une liste de groupe. Mais l'appeler plusieurs fois sans passer de groupe produit des résultats bizarres — les utilisateurs des appels précédents apparaissent. La liste est hantée. Trouvez et corrigez le bug.",
+        "code": "def add_user_to_group(user: str, group: list = []) -> list:\n    group.append(user)\n    return group\n\n# Expected: each call with no group should start fresh\nresult_a = add_user_to_group(\"Alice\")\nprint(result_a)   # ['Alice']  ✓\n\nresult_b = add_user_to_group(\"Bob\")\nprint(result_b)   # ['Alice', 'Bob']  ← BUG! Expected ['Bob']\n\nresult_c = add_user_to_group(\"Charlie\")\nprint(result_c)   # ['Alice', 'Bob', 'Charlie']  ← BUG!",
+        "language": "python",
+        "hint": "Les arguments par défaut sont évalués UNE SEULE FOIS — quand la fonction est définie, pas à chaque appel. Le même objet list est réutilisé. Utilisez None comme défaut et créez une nouvelle liste à l'intérieur de la fonction.",
+        "expectedConcepts": ["mutable-defaults", "object-identity", "function-definition"],
+        "validationRegex": "=\\s*None|if.*is None|if not group",
+        "expectedFix": "def add_user_to_group(user: str, group: list = None) -> list:\n    if group is None:\n        group = []\n    group.append(user)\n    return group"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "Arguments Mutables par Défaut — Le Piège le Plus Célèbre",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Le Piège de l'Argument Mutable par Défaut\n\nC'est le piège n°1 de Python, même pour les développeurs expérimentés.\n\n### Ce Qui Se Passe\n\nPython évalue les arguments par défaut **une seule fois**, quand la fonction est définie (au moment de l'import), pas à chaque appel :\n\n```python\ndef f(items=[]):  # Ce [] est créé UNE FOIS\n    items.append(1)\n    return items\n\n# Le même objet liste est réutilisé à chaque appel :\nf()  # [1]\nf()  # [1, 1]\nf()  # [1, 1, 1]\n```\n\nVous pouvez même voir l'objet par défaut :\n```python\nprint(f.__defaults__)  # ([1, 1, 1],) — c'est la même liste mutée\n```\n\n### La Correction — Le Pattern None\n\n```python\ndef f(items=None):\n    if items is None:\n        items = []\n    items.append(1)\n    return items\n```\n\nMaintenant chaque appel obtient une nouvelle liste. Ce pattern est si standard que les linters (pylint, ruff) signalent les arguments mutables par défaut.\n\n### Pourquoi Python Fait Ça ?\n\nPerformance et cohérence. Les définitions de fonctions sont des instructions exécutables en Python. Les valeurs par défaut font partie de l'objet fonction. Les évaluer une seule fois est plus simple et plus rapide.\n\n### Tous les Défauts Mutables Sont des Pièges\n\nLe même bug affecte : `dict`, `set`, `list`, toute instance de classe :\n\n```python\n# Tous dangereux :\ndef bad(d={}): ...\ndef bad(s=set()): ...\ndef bad(config=Config()): ...\n\n# Tous sûrs :\ndef good(d=None): d = d or {}\ndef good(s=None): s = s if s is not None else set()\n```",
+        "keyInsight": "Les arguments par défaut sont évalués une seule fois à la définition de la fonction, pas par appel. Les défauts mutables (list, dict, set) sont partagés entre tous les appels. Utilisez toujours None comme défaut et créez des objets frais à l'intérieur de la fonction.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Quand les défauts mutables sont intentionnels",
+            "content": "Rarement, le comportement d'état partagé est utilisé délibérément — comme un cache de fortune :\n\n```python\ndef fibonacci(n, cache={0: 0, 1: 1}):\n    if n not in cache:\n        cache[n] = fibonacci(n-1) + fibonacci(n-2)\n    return cache[n]\n```\n\nÇa fonctionne mais c'est fragile et obscur. Utilisez `@functools.lru_cache` à la place :\n\n```python\nfrom functools import lru_cache\n\n@lru_cache(maxsize=None)\ndef fibonacci(n):\n    if n < 2: return n\n    return fibonacci(n-1) + fibonacci(n-2)\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "La Surprise de la Copie Superficielle",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous copiez les paramètres d'un utilisateur pour créer les valeurs par défaut d'un nouvel utilisateur. Mais modifier les préférences de notification du nouvel utilisateur modifie aussi celles de l'original. La copie ne fait pas ce que vous pensez.",
+        "code": "import copy\n\ndefault_settings = {\n    \"theme\": \"dark\",\n    \"language\": \"en\",\n    \"notifications\": {\n        \"email\": True,\n        \"push\": True,\n        \"sms\": False\n    }\n}\n\n# Create new user's settings from defaults\nnew_user_settings = default_settings.copy()\nnew_user_settings[\"theme\"] = \"light\"  # Fine — creates new string ref\nnew_user_settings[\"notifications\"][\"sms\"] = True  # Modifies BOTH!\n\nprint(default_settings[\"notifications\"][\"sms\"])  # True ← BUG! Should be False\nprint(new_user_settings[\"notifications\"][\"sms\"])  # True",
+        "language": "python",
+        "hint": ".copy() est une copie superficielle — les objets imbriqués sont partagés, pas dupliqués. Utilisez copy.deepcopy() pour copier récursivement tous les objets imbriqués.",
+        "expectedConcepts": ["shallow-copy", "deep-copy", "reference-semantics"],
+        "validationRegex": "deepcopy|copy\\.deepcopy",
+        "expectedFix": "new_user_settings = copy.deepcopy(default_settings)"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "title": "Sémantiques de Copie — Superficielle, Profonde et Références",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Le Modèle de Références de Python\n\nChaque variable en Python est une **référence** (pointeur) vers un objet. L'assignation copie la référence, pas l'objet :\n\n```python\na = [1, 2, 3]\nb = a        # b pointe vers LA MÊME liste\nb.append(4)\nprint(a)     # [1, 2, 3, 4] — c'est le même objet !\nprint(a is b)  # True — même identité\n```\n\n### Trois Niveaux de Copie\n\n```python\nimport copy\n\noriginal = {\"users\": [\"Alice\", \"Bob\"], \"count\": 2}\n\n# 1. Assignation — pas de copie du tout (même objet)\nref = original  # ref EST original\n\n# 2. Copie superficielle — nouvel objet externe, objets internes partagés\nshallow = original.copy()  # ou dict(original), ou {**original}\n# shallow[\"users\"] EST original[\"users\"] — même liste !\n\n# 3. Copie profonde — copie récursive de tout\ndeep = copy.deepcopy(original)\n# deep[\"users\"] n'est PAS original[\"users\"] — liste indépendante\n```\n\n### Visualisation\n\n```\noriginal ──► { \"users\": ─► [\"Alice\", \"Bob\"]  ← partagé !\n               \"count\": 2 }\n                              ▲\nshallow  ──► { \"users\": ──────┘\n               \"count\": 2 }\n\ndeep     ──► { \"users\": ─► [\"Alice\", \"Bob\"]  ← copie indépendante\n               \"count\": 2 }\n```\n\n### Quand Utiliser Chaque Méthode\n\n| Opération | Utiliser Quand |\n|-----------|---------------|\n| `=` | Vous voulez que les deux noms réfèrent au même objet |\n| `.copy()` / `[:]` | Structure plate avec uniquement des valeurs immutables (chaînes, nombres) |\n| `copy.deepcopy()` | Structures imbriquées qui seront modifiées indépendamment |\n\n### Note de Performance\n\n`deepcopy()` est lent pour les grandes structures. Pour les données sérialisables en JSON, `json.loads(json.dumps(obj))` est parfois plus rapide mais perd les types non-JSON.",
+        "keyInsight": "Les variables sont des références en Python. La copie superficielle duplique le conteneur mais partage les objets imbriqués. La copie profonde duplique récursivement tout. Sachez quel niveau de copie vous avez besoin.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "L'astuce de copie par tranche de liste",
+            "content": "Pour les listes, `[:]` est un idiome courant de copie superficielle :\n\n```python\noriginal = [1, 2, [3, 4]]\nshallow = original[:]  # nouvelle liste, mêmes éléments\n\nshallow[0] = 99       # n'affecte pas l'original\nshallow[2].append(5)  # AFFECTE l'original ! [3, 4, 5]\n```\n\nAutres méthodes de copie superficielle :\n```python\nlist(original)      # constructeur list\n[*original]         # déballage\noriginal.copy()     # méthode explicite\n```\n\nToutes ont le même comportement superficiel."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-5",
+      "order": 5,
+      "title": "La Variable de Boucle Disparue",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous créez une liste de fonctions qui devraient chacune afficher leur numéro d'index. Mais elles affichent TOUTES le même nombre — le dernier. Un piège classique des closures.",
+        "code": "def create_handlers():\n    handlers = []\n    for i in range(5):\n        handlers.append(lambda: print(f\"Handler {i}\"))\n    return handlers\n\nfor handler in create_handlers():\n    handler()\n\n# Output:\n# Handler 4  ← all print 4!\n# Handler 4\n# Handler 4\n# Handler 4\n# Handler 4",
+        "language": "python",
+        "hint": "Le lambda capture la variable 'i' par référence, pas par valeur. Au moment où les lambdas s'exécutent, la boucle est terminée et i vaut 4. Corrigez en capturant la valeur actuelle de i comme argument par défaut : lambda i=i: ...",
+        "expectedConcepts": ["closures", "late-binding", "loop-variables"],
+        "validationRegex": "lambda\\s+i\\s*=\\s*i|lambda\\s+x\\s*=\\s*i|functools\\.partial",
+        "expectedFix": "handlers.append(lambda i=i: print(f\"Handler {i}\"))"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-6",
+      "order": 6,
+      "title": "Closures et Portée des Variables (LEGB)",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Closures à Liaison Tardive\n\nLes closures Python capturent les variables **par référence**, pas par valeur. Elles cherchent la variable au moment de l'appel, pas de la définition :\n\n```python\nx = 10\nf = lambda: x  # capture le NOM 'x'\nx = 20\nf()  # Retourne 20, pas 10 !\n```\n\nDans le bug de la boucle :\n```python\nfor i in range(5):\n    handlers.append(lambda: print(i))\n# Tous les lambdas partagent le même 'i'. Quand appelés, i vaut 4.\n```\n\n### La Correction : Capture par Argument par Défaut\n\n```python\nfor i in range(5):\n    handlers.append(lambda i=i: print(i))\n# Les arguments par défaut sont évalués au moment de la définition\n```\n\nAlternativement, utilisez `functools.partial` :\n```python\nfrom functools import partial\nfor i in range(5):\n    handlers.append(partial(print, f\"Handler {i}\"))\n```\n\n## La Règle LEGB\n\nPython résout les noms dans cet ordre :\n\n1. **L**ocal — à l'intérieur de la fonction courante\n2. **E**nglobant — dans toute fonction englobante (closure)\n3. **G**lobal — au niveau du module\n4. **B**uilt-in — les noms intégrés de Python\n\n```python\nname = \"global\"              # G\n\ndef outer():\n    name = \"englobant\"       # E\n    \n    def inner():\n        name = \"local\"       # L\n        print(name)           # → \"local\"\n    \n    inner()\n\nouter()\n```\n\n### Les Mots-Clés `nonlocal` et `global`\n\n```python\ndef counter():\n    count = 0\n    def increment():\n        nonlocal count  # Chercher dans la portée englobante\n        count += 1\n        return count\n    return increment\n\nc = counter()\nc()  # 1\nc()  # 2\n```\n\nSans `nonlocal`, `count += 1` créerait une nouvelle variable locale et lèverait `UnboundLocalError`.",
+        "keyInsight": "Les closures Python capturent les variables par référence (liaison tardive), pas par valeur. Les variables de boucle dans les closures partagent toutes la même référence. Corrigez avec capture par argument par défaut (i=i) ou functools.partial. LEGB détermine l'ordre de résolution des noms.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Le piège UnboundLocalError",
+            "content": "Si vous assignez à une variable n'importe où dans une fonction, Python la traite comme locale partout dans cette fonction :\n\n```python\ncount = 10\n\ndef increment():\n    print(count)   # UnboundLocalError : référencé avant assignation\n    count += 1     # Cette ligne fait de 'count' une variable locale\n\nincrement()\n```\n\nPython décide à la compilation : 'count est assigné dans cette fonction → c'est local'. Le print() échoue alors car le count local n'existe pas encore.\n\nCorrection : `global count` ou restructurer pour éviter la mutation."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-7",
+      "order": 7,
+      "title": "Le Générateur Épuisé",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous lisez des données de capteur depuis un générateur et essayez de les utiliser deux fois — une fois pour trouver le max, une fois pour calculer la moyenne. La deuxième opération retourne 0. Le générateur est mystérieusement vide la deuxième fois.",
+        "code": "def read_sensor_data():\n    \"\"\"Simulates reading temperature data from a sensor.\"\"\"\n    import random\n    random.seed(42)\n    for _ in range(100):\n        yield round(random.uniform(18.0, 32.0), 1)\n\nreadings = read_sensor_data()\n\n# Find the maximum temperature\nmax_temp = max(readings)\nprint(f\"Max temperature: {max_temp}°C\")  # Works fine\n\n# Compute the average — BUG: generator is exhausted!\nall_readings = list(readings)  # Empty list!\navg_temp = sum(all_readings) / len(all_readings) if all_readings else 0\nprint(f\"Average: {avg_temp}°C\")  # 0°C ← wrong!",
+        "language": "python",
+        "hint": "Les générateurs ne peuvent être itérés qu'une seule fois. Après que max() consomme toutes les valeurs, le générateur est épuisé. Convertissez d'abord en liste (list(read_sensor_data())), puis utilisez la liste pour les deux opérations.",
+        "expectedConcepts": ["generators", "iterators", "single-pass-iteration"],
+        "validationRegex": "list\\(read_sensor_data\\(\\)\\)|readings\\s*=\\s*list\\(",
+        "expectedFix": "readings = list(read_sensor_data())"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-8",
+      "order": 8,
+      "title": "Générateurs, Itérateurs et Évaluation Paresseuse",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Générateurs : Itérateurs à Passage Unique\n\nUne fonction générateur utilise `yield` au lieu de `return`. Elle produit des valeurs **paresseusement** — une à la fois, à la demande :\n\n```python\ndef count_up_to(n):\n    i = 0\n    while i < n:\n        yield i   # Se met en pause ici, retourne la valeur\n        i += 1    # Reprend ici à la prochaine itération\n```\n\n### Propriété Clé : Passage Unique\n\nLes générateurs ne peuvent être itérés **qu'une seule fois**. Après épuisement, ils sont vides pour toujours :\n\n```python\ngen = count_up_to(3)\nlist(gen)  # [0, 1, 2]\nlist(gen)  # [] — épuisé !\n```\n\nC'est différent d'une liste, qui peut être itérée autant de fois que voulu.\n\n### Pourquoi Utiliser les Générateurs ?\n\n**Efficacité mémoire**. Un générateur qui produit 10 millions de nombres utilise une mémoire constante — il ne garde que la valeur courante :\n\n```python\n# Ceci utilise ~80 Mo de mémoire :\nbig_list = [x ** 2 for x in range(10_000_000)]\n\n# Ceci utilise ~100 octets :\nbig_gen = (x ** 2 for x in range(10_000_000))\n```\n\n### Protocole d'Itération\n\nLes générateurs implémentent le protocole d'itération de Python :\n- `__iter__()` → retourne self\n- `__next__()` → retourne la valeur suivante, lève StopIteration quand terminé\n\n```python\ngen = count_up_to(2)\nnext(gen)  # 0\nnext(gen)  # 1\nnext(gen)  # exception StopIteration\n```\n\n### Quand Matérialiser\n\nConvertissez en liste quand vous avez besoin de :\n- Plusieurs passages sur les données\n- Accès aléatoire (indexation)\n- Vérification de longueur\n- Découpage (slicing)\n\nGardez comme générateur quand :\n- Les données sont trop grandes pour la mémoire\n- Vous n'avez besoin que d'un seul passage\n- Vous chaînez des transformations (pattern pipeline)",
+        "keyInsight": "Les générateurs produisent des valeurs paresseusement (une à la fois) et ne peuvent être itérés qu'une fois. Ils échangent la réutilisabilité contre l'efficacité mémoire. Si vous avez besoin de plusieurs passages, matérialisez d'abord en liste.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Pipelines de générateurs — traitement de données style Unix",
+            "content": "Les générateurs se composent magnifiquement pour les pipelines de traitement :\n\n```python\ndef read_logs(path):\n    with open(path) as f:\n        yield from f  # produit chaque ligne\n\ndef parse_json(lines):\n    import json\n    for line in lines:\n        yield json.loads(line)\n\ndef filter_errors(records):\n    for r in records:\n        if r.get('level') == 'ERROR':\n            yield r\n\n# Pipeline efficace en mémoire :\npipeline = filter_errors(parse_json(read_logs('app.log')))\nfor error in pipeline:  # Traite une ligne à la fois\n    handle_error(error)\n```\n\nCeci traite un fichier log de 10 Go en utilisant seulement quelques octets de mémoire."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-9",
+      "order": 9,
+      "title": "Variables de Classe vs d'Instance",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Chaque instance de Student devrait avoir sa propre liste de notes. Mais quand vous ajoutez une note à un étudiant, elle apparaît chez TOUS les étudiants. La classe est cassée.",
+        "code": "class Student:\n    name = \"\"\n    grades = []\n    \n    def __init__(self, name):\n        self.name = name\n    \n    def add_grade(self, grade):\n        self.grades.append(grade)\n    \n    def average(self):\n        return sum(self.grades) / len(self.grades) if self.grades else 0\n\nalice = Student(\"Alice\")\nbob = Student(\"Bob\")\n\nalice.add_grade(95)\nbob.add_grade(72)\n\nprint(f\"Alice: {alice.grades}\")  # [95, 72] ← BUG! Should be [95]\nprint(f\"Bob: {bob.grades}\")      # [95, 72] ← BUG! Should be [72]\nprint(alice.grades is bob.grades) # True — same object!",
+        "language": "python",
+        "hint": "grades = [] défini au niveau de la classe est une variable de CLASSE — partagée par toutes les instances. Déplacez-la dans __init__ comme self.grades = [] pour en faire une variable d'INSTANCE — chaque objet obtient sa propre liste.",
+        "expectedConcepts": ["class-variables", "instance-variables", "object-model"],
+        "validationRegex": "self\\.grades\\s*=\\s*\\[\\]",
+        "expectedFix": "def __init__(self, name):\n        self.name = name\n        self.grades = []"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-10",
+      "order": 10,
+      "title": "Le Modèle Objet de Python — Classes et Instances",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Variables de Classe vs Variables d'Instance\n\nPython a deux types d'attributs :\n\n```python\nclass Dog:\n    species = \"Canis familiaris\"  # Variable de CLASSE (partagée)\n    \n    def __init__(self, name):\n        self.name = name            # Variable d'INSTANCE (par objet)\n```\n\n### La Chaîne de Recherche\n\nQuand vous accédez à `obj.attr`, Python cherche :\n1. `obj.__dict__` (attributs d'instance)\n2. `type(obj).__dict__` (attributs de classe)\n3. Classes parentes (MRO)\n\n```python\nfido = Dog(\"Fido\")\nfido.name       # Trouvé dans __dict__ de l'instance\nfido.species    # Pas dans l'instance → trouvé dans __dict__ de la classe\n```\n\n### Le Piège : Variables de Classe Mutables\n\nLes variables de classe immutables (chaînes, nombres) sont sûres car l'assignation crée une nouvelle variable d'instance :\n\n```python\nclass Counter:\n    count = 0  # variable de classe\n\na = Counter()\na.count += 1   # Crée la variable d'instance a.count = 1\nCounter.count   # Toujours 0 — variable de classe inchangée\n```\n\nMais les variables de classe mutables (listes, dicts) sont partagées :\n\n```python\nclass Broken:\n    items = []  # variable de classe — UNE liste pour TOUTES les instances\n\na = Broken()\nb = Broken()\na.items.append(1)  # Modifie la liste de classe partagée\nb.items  # [1] — les deux voient la même liste !\n```\n\n### La Règle\n\n**Initialisez tous les attributs mutables dans `__init__` :**\n\n```python\nclass Correct:\n    def __init__(self):\n        self.items = []  # Chaque instance obtient sa propre liste\n```\n\nLes variables de classe sont appropriées pour :\n- Les constantes (`MAX_SIZE = 100`)\n- Les défauts immutables (`default_color = \"blue\"`)\n- Les compteurs partagés (avec précaution)\n\nNe mettez jamais de types mutables (list, dict, set) comme variables de classe sauf si vous voulez explicitement le partage.",
+        "keyInsight": "Les attributs au niveau de la classe sont partagés par toutes les instances. Les attributs au niveau de l'instance (self.x dans __init__) sont par objet. N'utilisez jamais de variables de classe mutables (listes, dicts) sauf si vous voulez le partage.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "__slots__ — restreindre les attributs d'instance",
+            "content": "Pour les classes avec beaucoup d'instances, `__slots__` économise la mémoire et attrape les fautes de frappe :\n\n```python\nclass Point:\n    __slots__ = ('x', 'y')  # Seuls ces attributs sont permis\n    \n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n\np = Point(1, 2)\np.z = 3  # AttributeError: 'Point' has no attribute 'z'\n```\n\nAvantages :\n- ~30% moins de mémoire par instance (pas de `__dict__`)\n- Accès aux attributs légèrement plus rapide\n- Attrape les fautes de frappe (assignation au mauvais nom d'attribut)"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-11",
+      "order": 11,
+      "title": "Le Virgule Flottante N'Égale Rien",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Votre calcul financier additionne trois postes. Le total devrait être 0.3, et l'assertion passe dans tous les autres langages que vous avez essayés. En Python, elle échoue.",
+        "code": "# Financial calculation — sum three line items\nitem_a = 0.1\nitem_b = 0.1\nitem_c = 0.1\n\ntotal = item_a + item_b + item_c\nexpected = 0.3\n\nif total == expected:\n    print(\"Transaction balanced ✓\")\nelse:\n    print(f\"DISCREPANCY: {total} != {expected}\")\n    print(f\"Difference: {total - expected}\")\n    # Output: DISCREPANCY: 0.30000000000000004 != 0.3",
+        "language": "python",
+        "hint": "Les nombres à virgule flottante ne peuvent pas représenter 0.1 exactement en binaire (comme 1/3 ne peut pas être exact en décimal). Utilisez math.isclose() pour les comparaisons, ou le module decimal pour l'arithmétique décimale exacte dans les calculs financiers.",
+        "expectedConcepts": ["floating-point", "ieee-754", "decimal-arithmetic"],
+        "validationRegex": "math\\.isclose|Decimal|abs\\(.*\\)\\s*<|round\\(",
+        "expectedFix": "import math\nif math.isclose(total, expected):"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-12",
+      "order": 12,
+      "title": "IEEE 754 et l'Arithmétique en Virgule Flottante",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Pourquoi 0.1 + 0.1 + 0.1 ≠ 0.3\n\nLes ordinateurs stockent les nombres en binaire. Tout comme $\\frac{1}{3}$ = 0.333... ne se termine jamais en décimal, $\\frac{1}{10}$ = 0.00011001100... ne se termine jamais en binaire.\n\nIEEE 754 stocke `0.1` comme le float 64 bits représentable le plus proche :\n```\n0.1000000000000000055511151231257827021181583404541015625\n```\n\nTrois de ceux-ci :\n```python\n0.1 + 0.1 + 0.1 = 0.30000000000000004  # Pas exactement 0.3\n```\n\n### Comparaison Sûre\n\n```python\nimport math\n\n# Tolérance relative (bon pour la plupart des cas) :\nmath.isclose(0.1 + 0.1 + 0.1, 0.3)  # True (rel_tol=1e-9 par défaut)\n\n# Tolérance absolue (pour les valeurs proches de zéro) :\nmath.isclose(result, 0.0, abs_tol=1e-9)\n```\n\n### Pour les Calculs Financiers : Utilisez Decimal\n\n```python\nfrom decimal import Decimal\n\n# MAUVAIS : passer un float conserve l'erreur\nDecimal(0.1)  # Decimal('0.100000000000000005551...')\n\n# CORRECT : passer une chaîne pour la représentation exacte\na = Decimal('0.1')\nb = Decimal('0.1')\nc = Decimal('0.1')\nprint(a + b + c == Decimal('0.3'))  # True — exact !\n```\n\n### Référence Rapide\n\n| Cas d'Usage | Solution |\n|-------------|----------|\n| Calcul scientifique | `math.isclose()` avec tolérance appropriée |\n| Financier/monétaire | `decimal.Decimal` avec entrées chaîne |\n| Compter l'argent | Centimes entiers (stocker comme `int`, diviser par 100 pour l'affichage) |\n| Tests | `pytest.approx(expected, rel=1e-6)` |",
+        "keyInsight": "Les nombres à virgule flottante (IEEE 754) ne peuvent pas représenter la plupart des fractions décimales exactement. N'utilisez jamais == pour comparer des floats. Utilisez math.isclose() pour l'usage général, decimal.Decimal pour les calculs financiers.",
+        "formula": "$0.1_{10} = 0.0\\overline{0011}_{2}$ (binaire périodique — ne peut pas être stocké exactement en bits finis)",
+        "expandableSections": [
+          {
+            "title": "Format IEEE 754 — qu'y a-t-il dans un float ?",
+            "content": "Un float 64 bits (le `float` de Python) a :\n- 1 bit de signe\n- 11 bits d'exposant (plage ~10⁻³⁰⁸ à ~10³⁰⁸)\n- 52 bits de mantisse (~15-17 chiffres décimaux significatifs)\n\n```python\nimport struct\nbytes = struct.pack('d', 0.1)\nprint(' '.join(f'{b:08b}' for b in bytes))\n```\n\nLimites pratiques :\n```python\n# Représentable :\n1.0 + 1e-15   # 1.000000000000001 (distinguable)\n1.0 + 1e-16   # 1.0 (arrondi — epsilon dépassé)\n\nimport sys\nsys.float_info.epsilon  # 2.22e-16 (plus petite différence distinguable près de 1.0)\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-13",
+      "order": 13,
+      "title": "La Gestion d'Exceptions Qui Tourne Mal",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Cette fonction de traitement utilise un try/except large pour 'gérer les erreurs gracieusement'. Mais elle avale silencieusement les vrais bugs — une faute de frappe dans un nom de variable (NameError) est attrapée et ignorée. Débuggez pourquoi le résultat est tout à zéro et corrigez la gestion d'erreurs.",
+        "code": "def process_records(records):\n    results = []\n    for record in records:\n        try:\n            # Bug: 'recrod' is a typo for 'record'\n            value = recrod[\"amount\"] * 1.1  # NameError!\n            results.append(round(value, 2))\n        except:\n            # \"Graceful error handling\" — catches EVERYTHING\n            results.append(0)\n    return results\n\ndata = [{\"amount\": 100}, {\"amount\": 200}, {\"amount\": 50}]\nprint(process_records(data))  # [0, 0, 0] ← all zeros, no error shown!",
+        "language": "python",
+        "hint": "'except:' sans rien attrape TOUTES les exceptions y compris NameError, KeyboardInterrupt et SystemExit. Attrapez toujours des exceptions spécifiques : except (KeyError, TypeError) as e: — cela laisse les vrais bugs se propager.",
+        "expectedConcepts": ["exception-handling", "bare-except", "error-specificity"],
+        "validationRegex": "except\\s+(KeyError|ValueError|TypeError|Exception)\\b",
+        "expectedFix": "except (KeyError, TypeError) as e:"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-14",
+      "order": 14,
+      "title": "La Gestion d'Exceptions Bien Faite",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## L'Anti-Pattern des Exceptions\n\n`except:` sans rien et `except Exception:` sont parmi les patterns les plus dangereux en Python. Ils cachent les bugs :\n\n```python\n# TERRIBLE — attrape NameError, TypeError, KeyboardInterrupt, tout :\ntry:\n    process(data)\nexcept:\n    pass  # Échec silencieux — les bugs sont invisibles\n\n# MAUVAIS — toujours trop large :\ntry:\n    process(data)\nexcept Exception:\n    pass  # Cache NameError, AttributeError, TypeError...\n```\n\n### Ce Que except: Attrape\n\n```\nBaseException\n├── SystemExit         ← sys.exit()\n├── KeyboardInterrupt  ← Ctrl+C\n├── GeneratorExit      ← nettoyage de générateur\n└── Exception\n    ├── NameError      ← fautes de frappe dans les noms de variables\n    ├── TypeError      ← mauvais types d'arguments\n    ├── AttributeError ← mauvais noms de méthodes/propriétés\n    ├── ValueError     ← valeurs invalides\n    ├── KeyError       ← clés de dict manquantes\n    ├── IOError        ← problèmes fichier/réseau\n    └── ...des centaines d'autres\n```\n\n### La Bonne Façon\n\n1. **Attrapez des exceptions spécifiques :**\n```python\ntry:\n    value = config[\"port\"]\n    port = int(value)\nexcept KeyError:\n    port = 8080  # Clé manquante → utiliser le défaut\nexcept ValueError:\n    raise ConfigError(f\"Port invalide : {value}\")\n```\n\n2. **Loggez les erreurs inattendues :**\n```python\ntry:\n    process(record)\nexcept (ValueError, KeyError) as e:\n    logger.warning(f\"Enregistrement ignoré : {e}\")\n    results.append(None)\n```\n\n3. **Laissez les vrais bugs crasher :**\nNameError, TypeError, AttributeError — ce sont des erreurs de programmation. Elles doivent crasher bruyamment pour que vous les corrigiez.\n\n### Les Clauses Finally et Else\n\n```python\ntry:\n    f = open('data.txt')\n    data = f.read()\nexcept FileNotFoundError:\n    data = default_data\nelse:\n    # S'exécute SEULEMENT si aucune exception n'a été levée\n    process(data)\nfinally:\n    # S'exécute TOUJOURS — même en cas d'exception ou de return\n    f.close()\n```",
+        "keyInsight": "N'utilisez jamais except: ou except Exception:. Attrapez uniquement les exceptions spécifiques que vous pouvez réellement gérer. Laissez les erreurs de programmation (NameError, TypeError) crasher bruyamment. Le silence n'est pas de la gestion d'erreur — c'est cacher les bugs.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "EAFP vs LBYL — la philosophie de Python",
+            "content": "Python préfère 'Il vaut mieux demander pardon que permission' (EAFP) plutôt que 'Regarder avant de sauter' (LBYL) :\n\n```python\n# LBYL (non-Pythonique) :\nif key in dictionary:\n    value = dictionary[key]\nelse:\n    value = default\n\n# EAFP (Pythonique) :\ntry:\n    value = dictionary[key]\nexcept KeyError:\n    value = default\n\n# Le mieux : utiliser .get()\nvalue = dictionary.get(key, default)\n```\n\nEAFP est préféré car :\n1. Évite les conditions de course (vérifier + utiliser n'est pas atomique)\n2. Gère naturellement les cas limites\n3. Souvent plus rapide (le chemin normal n'a pas de surcoût)"
+          }
+        ]
+      },
+      "xpReward": 5
+    }
+  ]
+}

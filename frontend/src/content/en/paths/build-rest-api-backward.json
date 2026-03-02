@@ -1,0 +1,308 @@
+{
+  "id": "build-rest-api-backward",
+  "slug": "build-rest-api-backward",
+  "title": "Build a REST API — Backward",
+  "domain": "web-dev",
+  "mode": "problem-first",
+  "difficulty": "intermediate",
+  "description": "Start from a deployed endpoint and reverse-engineer how APIs work. From Express routes to HTTP semantics, middleware chains, authentication, error handling, CORS, and the TCP layer underneath. Sixteen steps, zero magic.",
+  "xpReward": 360,
+  "estimatedMinutes": 60,
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "The Endpoint Exists",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You have a working API: `GET /api/users` returns a JSON list. Your task: make `POST /api/users` create a new user and return it with status 201. Here is the incomplete server.",
+        "code": "const express = require('express');\nconst app = express();\napp.use(express.json());\n\nconst users = [{ id: 1, name: 'Alice' }];\n\napp.get('/api/users', (req, res) => {\n  res.json(users);\n});\n\n// TODO: Add POST /api/users that:\n// 1. Reads name from req.body\n// 2. Creates a user with auto-incremented id\n// 3. Pushes to the users array\n// 4. Returns the new user with status 201\n\napp.listen(3000);",
+        "language": "javascript",
+        "hint": "Use app.post() with the same path. Access the body via req.body.name (express.json() is already set up). Use res.status(201).json(newUser).",
+        "expectedConcepts": ["http-methods", "request-body", "json-response"],
+        "validationRegex": "app\\.post\\(['\"]\\/?api\\/users['\"]",
+        "expectedFix": "app.post('/api/users', (req, res) => {\n  const user = { id: users.length + 1, name: req.body.name };\n  users.push(user);\n  res.status(201).json(user);\n});"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "HTTP Methods — Verbs with Meaning",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## HTTP Methods\n\nHTTP defines **methods** (verbs) that communicate the intent of a request:\n\n| Method | CRUD | Idempotent | Safe | Body |\n|--------|------|------------|------|------|\n| GET | Read | Yes | Yes | No |\n| POST | Create | No | No | Yes |\n| PUT | Replace | Yes | No | Yes |\n| PATCH | Update | No | No | Yes |\n| DELETE | Remove | Yes | No | Optional |\n\n### Why Semantics Matter\n\nThe method isn't just a label — it affects real behavior:\n\n- **Caching**: Browsers and CDNs cache GET responses automatically. They never cache POST.\n- **Retries**: If a GET request fails, clients can safely retry (idempotent). A POST might create duplicates.\n- **Preflight**: Browsers send an OPTIONS request before non-simple POST/PUT/DELETE requests (CORS).\n- **Bookmarking**: GET requests can be bookmarked and shared. POST can't.\n\n### Idempotency\n\nAn idempotent method produces the same result whether called once or 100 times:\n\n```\nPUT /api/users/42 {name: 'Bob'}  → always sets name to Bob\nDELETE /api/users/42             → always ensures user 42 is gone\nPOST /api/users {name: 'Bob'}    → creates a NEW user each time\n```\n\nThis is critical for reliability. If a network timeout occurs during PUT, the client can safely retry.",
+        "keyInsight": "HTTP methods are semantic contracts. GET reads, POST creates. The method determines caching, retry safety, and browser behavior — not just server routing.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "HEAD and OPTIONS — the forgotten methods",
+            "content": "**HEAD** is identical to GET but returns only headers (no body). Used to check if a resource exists or get its Content-Length before downloading.\n\n**OPTIONS** returns the allowed methods for a URL and CORS headers. Browsers send it automatically before cross-origin POST/PUT/DELETE (preflight check)."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "req.body is Undefined",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Your POST handler receives the request but `req.body` is `undefined`. The client sends JSON with Content-Type: application/json. The server crashes with 'Cannot read property name of undefined'. Something is missing before your route.",
+        "code": "const express = require('express');\nconst app = express();\n\nconst users = [{ id: 1, name: 'Alice' }];\n\n// Something is missing here...\n\napp.post('/api/users', (req, res) => {\n  console.log(req.body); // undefined!\n  const user = { id: users.length + 1, name: req.body.name };\n  users.push(user);\n  res.status(201).json(user);\n});\n\napp.listen(3000);",
+        "language": "javascript",
+        "expectedFix": "app.use(express.json());",
+        "validationRegex": "express\\.json\\(\\)",
+        "hint": "Express does NOT parse request bodies by default. You need middleware that reads the raw bytes from the TCP stream, parses JSON, and attaches it to req.body."
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "title": "Middleware — The Pipeline Pattern",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Middleware\n\nMiddleware functions execute **between** request arrival and response. They form a pipeline:\n\n```\nRequest → [Logger] → [Auth] → [JSON Parser] → [Route Handler] → Response\n                 ↘ (can short-circuit: 401)\n```\n\nEach middleware receives `(req, res, next)`:\n\n```javascript\nfunction logger(req, res, next) {\n  console.log(`${req.method} ${req.url}`);\n  next(); // Pass to next middleware\n}\n\nfunction auth(req, res, next) {\n  if (!req.headers.authorization) {\n    return res.status(401).json({ error: 'No token' }); // Short-circuit\n  }\n  next(); // Continue pipeline\n}\n\napp.use(logger);           // Runs on ALL requests\napp.use('/api', auth);     // Runs only on /api/* routes\napp.use(express.json());   // Parses JSON bodies\n```\n\n### What express.json() Actually Does\n\n1. Check Content-Type header (application/json?)\n2. Read raw bytes from the TCP stream (req is a Readable stream)\n3. Buffer the entire body into memory\n4. Call `JSON.parse()` on the buffer\n5. Attach the result to `req.body`\n6. Call `next()`\n\nWithout it, the body bytes are never read from the stream — they're discarded.\n\n### Order Matters\n\nMiddleware runs in **registration order**. If you register `express.json()` AFTER your route, the route runs first and finds `req.body` undefined.",
+        "keyInsight": "Middleware is a pipeline of functions between request and response. Each can transform the request (add parsed body, verify auth) or short-circuit (reject with 401). Order of registration matters.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Common middleware patterns",
+            "content": "| Middleware | Purpose | Example |\n|-----------|---------|--------|\n| cors() | Add CORS headers | `app.use(cors())` |\n| helmet() | Security headers | `app.use(helmet())` |\n| morgan() | HTTP request logging | `app.use(morgan('combined'))` |\n| compression() | gzip responses | `app.use(compression())` |\n| rateLimit() | Throttle requests | `app.use(rateLimit({max: 100}))` |\n\nAll follow the same `(req, res, next)` contract."
+          },
+          {
+            "title": "Error-handling middleware",
+            "content": "Express error handlers have FOUR parameters:\n\n```javascript\napp.use((err, req, res, next) => {\n  console.error(err.stack);\n  res.status(err.status || 500).json({\n    error: err.message || 'Internal Server Error'\n  });\n});\n```\n\nWhen any middleware/route calls `next(error)` or throws, Express skips to the nearest 4-argument middleware. This centralizes error handling."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-5",
+      "order": 5,
+      "title": "Dynamic Routes — Get User by ID",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "The API needs individual user lookups: `GET /api/users/1` should return the user with id 1. Return 404 if not found. Add the route with a dynamic parameter.",
+        "code": "const express = require('express');\nconst app = express();\napp.use(express.json());\n\nconst users = [\n  { id: 1, name: 'Alice', email: 'alice@example.com' },\n  { id: 2, name: 'Bob', email: 'bob@example.com' },\n  { id: 3, name: 'Charlie', email: 'charlie@example.com' }\n];\n\napp.get('/api/users', (req, res) => res.json(users));\n\n// TODO: GET /api/users/:id\n// - Parse the id from the URL\n// - Find the user in the array\n// - Return 404 if not found\n// - Return the user if found\n\napp.listen(3000);",
+        "language": "javascript",
+        "hint": "Express uses :paramName in the path. Access via req.params.id. Remember it's a string — parseInt() it. Return res.status(404).json({error: 'Not found'}) when missing.",
+        "expectedConcepts": ["url-parameters", "routing", "404-handling"],
+        "validationRegex": "app\\.get\\(['\"]\\/?api\\/users\\/:id['\"]",
+        "expectedFix": "app.get('/api/users/:id', (req, res) => {\n  const user = users.find(u => u.id === parseInt(req.params.id));\n  if (!user) return res.status(404).json({ error: 'Not found' });\n  res.json(user);\n});"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-6",
+      "order": 6,
+      "title": "Routing — URL to Handler Mapping",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## URL Routing\n\nA router maps **URL patterns** to **handler functions**. When a request arrives:\n\n1. Parse the URL path from the HTTP request line\n2. Match against registered patterns (in registration order)\n3. Extract dynamic segments (`:id` → `req.params.id`)\n4. Call the matching handler\n\n```\nGET /api/users/42?fields=name,email\n    └── path      └── query string\n\nPattern: /api/users/:id → params = { id: '42' }\nQuery: req.query = { fields: 'name,email' }\n```\n\n### URL Anatomy\n\n```\nhttps://api.example.com:443/api/users/42?fields=name#section\n└─ scheme ─┘└── host ───┘└port┘└── path ──┘└─ query ─┘└ fragment\n```\n\n- **Scheme**: Protocol (https = HTTP + TLS encryption)\n- **Host**: DNS lookup → IP address\n- **Port**: Which process on the server (443 = default HTTPS)\n- **Path**: Resource location (router matches this)\n- **Query**: Parameters (filtering, pagination)\n- **Fragment**: Client-side only (never sent to server)\n\n### Route Priority\n\nExpress matches routes in **definition order**. Specific routes should come before generic ones:\n\n```javascript\n// WRONG: /api/users/:id matches '/api/users/search' first!\napp.get('/api/users/:id', getUser);\napp.get('/api/users/search', searchUsers);  // Never reached\n\n// RIGHT: specific route first\napp.get('/api/users/search', searchUsers);\napp.get('/api/users/:id', getUser);\n```",
+        "keyInsight": "Routing maps URL patterns to code. Dynamic segments (:id) extract values from the URL. Routes match in definition order — specific patterns before generic ones.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Router modules for large apps",
+            "content": "Express supports modular routing:\n\n```javascript\n// routes/users.js\nconst router = express.Router();\nrouter.get('/', listUsers);\nrouter.get('/:id', getUser);\nrouter.post('/', createUser);\nrouter.patch('/:id', updateUser);\nrouter.delete('/:id', deleteUser);\nmodule.exports = router;\n\n// app.js\napp.use('/api/users', require('./routes/users'));\napp.use('/api/posts', require('./routes/posts'));\n```\n\nThis keeps the main app file clean and each resource's routes self-contained."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-7",
+      "order": 7,
+      "title": "The Wrong Status Code",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Your DELETE endpoint works but returns 200 with a JSON body. The API consumer (a mobile team) complains that their HTTP library expects 204 for successful deletions. Fix the semantics: 204 No Content for success, 404 if user doesn't exist.",
+        "code": "app.delete('/api/users/:id', (req, res) => {\n  const index = users.findIndex(u => u.id === parseInt(req.params.id));\n  if (index !== -1) {\n    users.splice(index, 1);\n    res.json({ deleted: true }); // Wrong: returns 200 with body\n  } else {\n    res.json({ error: 'Not found' }); // Wrong: returns 200 for error\n  }\n});",
+        "language": "javascript",
+        "hint": "204 means 'success, no body to return'. 404 means 'resource not found'. Use res.status(204).end() and res.status(404).json({error: 'Not found'}).",
+        "expectedConcepts": ["http-status-codes", "rest-semantics"],
+        "validationRegex": "res\\.status\\(204\\)",
+        "expectedFix": "res.status(204).end()"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-8",
+      "order": 8,
+      "title": "HTTP Status Codes — Machine-Readable Semantics",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## HTTP Status Codes\n\nStatus codes are a **communication protocol** between server and client:\n\n### The Five Categories\n\n| Range | Meaning | Key Codes |\n|-------|---------|----------|\n| 1xx | Informational | 101 Switching Protocols (WebSocket upgrade) |\n| 2xx | Success | 200 OK, 201 Created, 204 No Content |\n| 3xx | Redirection | 301 Moved Permanently, 304 Not Modified |\n| 4xx | Client Error | 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable, 429 Too Many Requests |\n| 5xx | Server Error | 500 Internal Error, 502 Bad Gateway, 503 Unavailable |\n\n### Choosing the Right Code\n\n```\nCreated a resource?        → 201 + Location header\nDeleted successfully?      → 204 (no body)\nBad input from client?     → 400 (malformed) or 422 (valid JSON, invalid data)\nNot authenticated?         → 401 (who are you?)\nAuthenticated but denied?  → 403 (you can't do this)\nResource doesn't exist?    → 404\nConflict (duplicate email)? → 409\nRate limited?              → 429 + Retry-After header\nUnexpected server crash?   → 500\n```\n\n### Why It Matters\n\n- **401 vs 403**: 401 means 'send credentials'. 403 means 'your credentials are valid, but you don't have permission.'\n- **400 vs 422**: 400 means the JSON is malformed. 422 means the JSON is valid but the data is wrong (email already exists).\n- **429 + Retry-After**: Clients and load balancers can throttle and retry automatically.\n- **304 Not Modified**: Browser uses cached version — saves bandwidth and latency.",
+        "keyInsight": "Status codes are machine-readable semantics. Browsers, caches, proxies, and client libraries make automatic decisions based on them. 200-for-everything is an anti-pattern that breaks these mechanisms.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "The 401 / 403 distinction that most APIs get wrong",
+            "content": "Most APIs return 403 for everything auth-related. The correct semantics:\n\n- **401 Unauthorized** (misnomer — should be 'Unauthenticated'): 'I don't know who you are. Send a valid token.'\n- **403 Forbidden**: 'I know who you are (valid token), but you don't have permission for this resource.'\n\nWhy this matters: OAuth clients will attempt to refresh tokens on 401. On 403, they know re-authenticating won't help."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-9",
+      "order": 9,
+      "title": "Input Validation — Garbage In, Garbage Out",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Users can POST any JSON and it creates a user — even empty objects or objects with random fields. Add validation: require name (string, 2-50 chars) and email (valid format). Return 422 with error details for invalid input.",
+        "code": "app.post('/api/users', (req, res) => {\n  // No validation! These all succeed:\n  // POST {} → creates { id: 2, name: undefined }\n  // POST { name: '' } → creates { id: 2, name: '' }\n  // POST { name: 123 } → creates { id: 2, name: 123 }\n  \n  const user = {\n    id: users.length + 1,\n    name: req.body.name,\n    email: req.body.email\n  };\n  users.push(user);\n  res.status(201).json(user);\n});",
+        "language": "javascript",
+        "hint": "Check typeof, string length, and email format before creating the user. Return res.status(422).json({ errors: [...] }) for invalid input.",
+        "expectedConcepts": ["input-validation", "422-status", "defensive-programming"],
+        "validationRegex": "res\\.status\\(422\\)",
+        "expectedFix": "if (!name || typeof name !== 'string' || name.length < 2)"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-10",
+      "order": 10,
+      "title": "Validation — Trust No Input",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Input Validation\n\nThe first rule of API security: **never trust client input**. Validate everything — types, lengths, formats, ranges.\n\n### Validation Strategy\n\n```javascript\n// Manual validation:\napp.post('/api/users', (req, res) => {\n  const errors = [];\n  const { name, email } = req.body;\n  \n  if (!name || typeof name !== 'string') \n    errors.push({ field: 'name', message: 'Required string' });\n  else if (name.length < 2 || name.length > 50)\n    errors.push({ field: 'name', message: '2-50 characters' });\n    \n  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))\n    errors.push({ field: 'email', message: 'Valid email required' });\n  \n  if (errors.length > 0)\n    return res.status(422).json({ errors });\n  \n  // Safe to proceed\n});\n```\n\n### Schema Validation Libraries\n\nManual validation doesn't scale. Use libraries:\n\n```javascript\n// With Zod:\nconst createUserSchema = z.object({\n  name: z.string().min(2).max(50),\n  email: z.string().email(),\n  role: z.enum(['user', 'admin']).default('user')\n});\n\napp.post('/api/users', (req, res) => {\n  const result = createUserSchema.safeParse(req.body);\n  if (!result.success) {\n    return res.status(422).json({ errors: result.error.issues });\n  }\n  // result.data is typed and validated\n});\n```\n\n### Security Implications\n\n| Without Validation | Risk |\n|---|---|\n| No type check | NoSQL injection, type confusion |\n| No length limit | DoS (1GB name field) |\n| No sanitization | XSS in stored data |\n| No enum check | Privilege escalation (role: 'admin') |",
+        "keyInsight": "Never trust client input. Validate types, lengths, formats, and ranges. Return 422 with structured error details. Use schema validation libraries (Zod, Joi) for maintainability.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Validation middleware pattern",
+            "content": "Create reusable validation middleware:\n\n```javascript\nfunction validate(schema) {\n  return (req, res, next) => {\n    const result = schema.safeParse(req.body);\n    if (!result.success) {\n      return res.status(422).json({ errors: result.error.issues });\n    }\n    req.validated = result.data;\n    next();\n  };\n}\n\n// Usage:\napp.post('/api/users', validate(createUserSchema), createUser);\napp.patch('/api/users/:id', validate(updateUserSchema), updateUser);\n```\n\nThe route handler is guaranteed to receive validated data."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-11",
+      "order": 11,
+      "title": "Authentication — Who Is Calling?",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Your API is public — anyone can create, update, or delete users. Add Bearer token authentication middleware that checks for a valid token in the Authorization header. Protected routes should return 401 without a token.",
+        "code": "const express = require('express');\nconst app = express();\napp.use(express.json());\n\n// TODO: Create auth middleware that:\n// 1. Reads the Authorization header\n// 2. Checks it starts with 'Bearer '\n// 3. Verifies the token (for now, check against a hardcoded secret)\n// 4. Returns 401 if invalid\n// 5. Calls next() if valid\n\napp.get('/api/users', (req, res) => {\n  res.json(users); // Public — no auth needed\n});\n\n// These should be protected:\napp.post('/api/users', (req, res) => {\n  /* ... */\n});\napp.delete('/api/users/:id', (req, res) => {\n  /* ... */\n});",
+        "language": "javascript",
+        "hint": "Create a function auth(req, res, next) that checks req.headers.authorization. Apply it as middleware to specific routes: app.post('/api/users', auth, handler).",
+        "expectedConcepts": ["authentication", "bearer-tokens", "middleware-auth"],
+        "validationRegex": "req\\.headers\\.authorization|req\\.header\\(['\"]authorization['\"]\\)",
+        "expectedFix": "function auth(req, res, next) {\n  const token = req.headers.authorization?.replace('Bearer ', '');\n  if (!token) return res.status(401).json({ error: 'No token' });\n  next();\n}"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-12",
+      "order": 12,
+      "title": "Authentication and Authorization Patterns",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Authentication vs Authorization\n\n- **Authentication** (AuthN): 'Who are you?' — verify identity\n- **Authorization** (AuthZ): 'What can you do?' — check permissions\n\n### Bearer Token Flow\n\n```\n1. Client: POST /auth/login { email, password }\n2. Server: Verify credentials → generate JWT\n3. Server: Return { token: 'eyJhbG...' }\n4. Client: Store token (memory, httpOnly cookie)\n5. Client: GET /api/users  Authorization: Bearer eyJhbG...\n6. Server: Verify JWT → extract user → proceed\n```\n\n### JWT Structure\n\nA JSON Web Token has three parts: `header.payload.signature`\n\n```\neyJhbGciOiJIUzI1NiJ9.         ← Header (algorithm)\neyJ1aWQiOiI0MiIsInJvbGUiOiJ1c2VyIn0.  ← Payload (claims: uid, role, exp)\nSflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV  ← Signature (HMAC of header+payload)\n```\n\nThe server verifies the signature using its secret key. If anyone tampers with the payload, the signature won't match.\n\n### Auth Middleware Pattern\n\n```javascript\nfunction authenticate(req, res, next) {\n  const auth = req.headers.authorization;\n  if (!auth?.startsWith('Bearer '))\n    return res.status(401).json({ error: 'Token required' });\n  \n  try {\n    const payload = jwt.verify(auth.slice(7), JWT_SECRET);\n    req.user = payload; // Attach user to request\n    next();\n  } catch (e) {\n    res.status(401).json({ error: 'Invalid token' });\n  }\n}\n\n// Per-route auth:\napp.get('/api/profile', authenticate, getProfile);\napp.post('/api/posts', authenticate, createPost);\n```",
+        "keyInsight": "Authentication verifies identity (who), authorization checks permissions (what). Bearer tokens (JWTs) are stateless — the server can verify without a database lookup. Auth middleware protects routes selectively.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Sessions vs JWTs — the tradeoffs",
+            "content": "**Sessions**: Server stores state in memory/DB. Cookie holds session ID. Can revoke instantly.\n\n**JWTs**: Stateless — server stores nothing. Token is self-contained. Cannot revoke until expiration (without a blacklist).\n\n| Concern | Sessions | JWTs |\n|---------|----------|------|\n| State | Server-side | Client-side |\n| Revocation | Instant | Requires blacklist |\n| Scaling | Needs shared store | Stateless |\n| Size | Small cookie | Large token |\n| Security | CSRF risk | XSS risk (if in localStorage) |\n\nBest practice: Short-lived JWTs (15min) + long-lived refresh tokens (httpOnly cookie)."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-13",
+      "order": 13,
+      "title": "CORS — The Browser Blocks You",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Your React frontend at localhost:3000 calls the API at localhost:8080. The browser blocks the request: 'CORS policy: No Access-Control-Allow-Origin header'. The same curl command works fine. Fix the server to allow cross-origin requests.",
+        "code": "const express = require('express');\nconst app = express();\napp.use(express.json());\n\n// The frontend at http://localhost:3000 gets CORS errors\n// when calling this API at http://localhost:8080\n\n// TODO: Add CORS headers to allow the frontend origin\n\napp.get('/api/users', (req, res) => {\n  res.json(users);\n});\n\napp.listen(8080);",
+        "language": "javascript",
+        "hint": "Add middleware that sets the Access-Control-Allow-Origin header. For development, allow your frontend origin. Also handle OPTIONS preflight requests.",
+        "expectedConcepts": ["cors", "same-origin-policy", "preflight"],
+        "validationRegex": "Access-Control-Allow-Origin|cors\\(",
+        "expectedFix": "app.use((req, res, next) => {\n  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');\n  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');\n  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');\n  if (req.method === 'OPTIONS') return res.sendStatus(204);\n  next();\n});"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-14",
+      "order": 14,
+      "title": "CORS — Why Browsers Block and Curl Doesn't",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Cross-Origin Resource Sharing (CORS)\n\n### The Same-Origin Policy\n\nBrowsers enforce the **Same-Origin Policy**: JavaScript on `origin-a.com` cannot read responses from `origin-b.com`. An origin is `scheme + host + port`:\n\n```\nhttp://localhost:3000  ≠  http://localhost:8080   (different port)\nhttps://app.com        ≠  https://api.app.com     (different host)\nhttp://site.com        ≠  https://site.com         (different scheme)\n```\n\n### Why curl works\n\ncurl isn't a browser — it doesn't enforce the Same-Origin Policy. CORS is purely a **browser security mechanism** to protect users from malicious JavaScript.\n\n### The CORS Handshake\n\n**Simple requests** (GET with standard headers): Browser sends request, checks response for `Access-Control-Allow-Origin`.\n\n**Preflight requests** (POST with JSON, custom headers): Browser first sends OPTIONS:\n\n```\n1. Browser: OPTIONS /api/users\n   Origin: http://localhost:3000\n   Access-Control-Request-Method: POST\n   Access-Control-Request-Headers: Content-Type, Authorization\n\n2. Server: 204\n   Access-Control-Allow-Origin: http://localhost:3000\n   Access-Control-Allow-Methods: POST, GET, PUT, DELETE\n   Access-Control-Allow-Headers: Content-Type, Authorization\n   Access-Control-Max-Age: 86400\n\n3. Browser: (preflight passed) → sends actual POST request\n```\n\n### Production Configuration\n\n```javascript\n// Never use * with credentials:\napp.use(cors({\n  origin: ['https://app.example.com', 'https://admin.example.com'],\n  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],\n  allowedHeaders: ['Content-Type', 'Authorization'],\n  credentials: true, // Allow cookies\n  maxAge: 86400      // Cache preflight for 24h\n}));\n```",
+        "keyInsight": "CORS is a browser security policy that blocks cross-origin requests by default. The server must explicitly allow specific origins via headers. Curl and servers don't enforce CORS — only browsers do.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Why ' * ' (wildcard) is dangerous with credentials",
+            "content": "If you set `Access-Control-Allow-Origin: *`, browsers REFUSE to send cookies or Authorization headers. This prevents a malicious site from making authenticated requests to your API with the user's cookies.\n\nFor authenticated APIs, you MUST specify the exact origin:\n```\nAccess-Control-Allow-Origin: https://yourdomain.com\n```\n\nNever dynamically reflect the Origin header without validation — that defeats the purpose of CORS."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-15",
+      "order": 15,
+      "title": "Error Handling — The Unhandled Crash",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "When the database connection fails, your Express app crashes with an unhandled exception and the process exits. Add centralized error handling: catch async errors and return proper 500 responses instead of crashing.",
+        "code": "const express = require('express');\nconst app = express();\n\napp.get('/api/users', async (req, res) => {\n  // If db.query() throws, Express doesn't catch it —\n  // the process crashes with an unhandled promise rejection!\n  const users = await db.query('SELECT * FROM users');\n  res.json(users);\n});\n\napp.post('/api/users', async (req, res) => {\n  // Same problem here — any await that rejects crashes the server\n  const user = await db.query('INSERT INTO users ...');\n  res.status(201).json(user);\n});\n\n// TODO: Add error handling so async errors don't crash the server\n\napp.listen(3000);",
+        "language": "javascript",
+        "hint": "Wrap async handlers with try/catch, or create an asyncHandler wrapper. Add a 4-argument error middleware at the END of the middleware chain.",
+        "expectedConcepts": ["error-handling", "async-errors", "500-status"],
+        "validationRegex": "(err,\\s*req,\\s*res,\\s*next)|asyncHandler|try\\s*\\{",
+        "expectedFix": "app.use((err, req, res, next) => {\n  console.error(err);\n  res.status(500).json({ error: 'Internal Server Error' });\n});"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-16",
+      "order": 16,
+      "title": "TCP — What's Under HTTP",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## The Full Request Journey\n\nHTTP rides on **TCP** (Transmission Control Protocol). Here's what happens when a browser fetches your API:\n\n```\nBrowser\n  │\n  ├── 1. DNS lookup: api.example.com → 93.184.216.34\n  ├── 2. TCP handshake (SYN → SYN-ACK → ACK)\n  ├── 3. TLS handshake (certificate exchange, key agreement)\n  ├── 4. HTTP request (text over encrypted TCP):\n  │      GET /api/users HTTP/1.1\n  │      Host: api.example.com\n  │      Authorization: Bearer eyJhbG...\n  │      Accept: application/json\n  │\n  ├── 5. Server processes (middleware → route handler)\n  │\n  ├── 6. HTTP response (text over encrypted TCP):\n  │      HTTP/1.1 200 OK\n  │      Content-Type: application/json\n  │      [{ \"id\": 1, \"name\": \"Alice\" }]\n  │\n  └── 7. TCP connection kept alive for future requests (HTTP/1.1 keep-alive)\n```\n\n### Ports and app.listen(3000)\n\nA **port** is a 16-bit number (0-65535) that multiplexes applications on one IP address. Think: IP = building address, port = apartment number.\n\n`app.listen(3000)` asks the OS to reserve port 3000 exclusively for this process via a **TCP socket**. That's why `EADDRINUSE` means another process already claimed it.\n\n### TCP Guarantees\n\n| Property | Meaning |\n|----------|--------|\n| Reliable | Data arrives or you get an error |\n| Ordered | Bytes arrive in the sequence sent |\n| Connection-oriented | Three-way handshake before data |\n| Flow control | Sender slows if receiver is overwhelmed |\n\n### The Layer Model\n\n```\nYour Express route handler  (Application — HTTP)\n         ↓\n     Node.js / OS           (Transport — TCP)\n         ↓\n     Network card            (Network — IP)\n         ↓\n     WiFi / Ethernet         (Link — physical)\n```\n\nEach layer has its own protocol, headers, and failure modes. HTTP status 503 means your application layer is unavailable. A TCP RST means the connection was forcibly closed. Understanding the layers helps you debug network issues.",
+        "keyInsight": "HTTP is a text protocol riding on TCP. TCP guarantees reliable, ordered delivery via three-way handshake. Ports route data to the right process. Every API call traverses DNS → TCP → TLS → HTTP — understanding each layer makes you a better debugger.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "HTTP/1.1 vs HTTP/2 vs HTTP/3",
+            "content": "**HTTP/1.1**: Text-based, one request per TCP connection (or pipelining). Keep-alive reuses connections.\n\n**HTTP/2**: Binary framing, multiplexing (many requests over ONE TCP connection), header compression (HPACK), server push.\n\n**HTTP/3**: Runs on QUIC (UDP-based) instead of TCP. Eliminates head-of-line blocking. Faster connection setup (0-RTT). Used by Google, Cloudflare, Meta.\n\nThe move from TCP to QUIC fixes TCP's biggest problem: if one packet is lost, ALL streams are blocked until retransmit. QUIC isolates streams independently."
+          },
+          {
+            "title": "Why understanding TCP matters for API design",
+            "content": "TCP concepts directly impact API performance:\n\n- **Connection pooling**: Creating TCP connections is expensive (3-way handshake + TLS = ~100ms). HTTP clients reuse connections.\n- **Keep-alive**: HTTP/1.1 defaults to persistent connections. `Connection: close` forces a new connection per request.\n- **Nagle's algorithm**: TCP buffers small writes to reduce overhead. This can add 200ms latency to small API responses. `socket.setNoDelay(true)` disables it.\n- **TCP window size**: Limits throughput on new connections ('slow start'). Streaming large responses may start slow."
+          }
+        ]
+      },
+      "xpReward": 10
+    }
+  ]
+}

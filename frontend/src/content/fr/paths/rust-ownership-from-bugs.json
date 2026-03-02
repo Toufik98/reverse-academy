@@ -1,0 +1,273 @@
+{
+  "id": "rust-ownership-from-bugs",
+  "slug": "rust-ownership-from-bugs",
+  "title": "Rust : Pourquoi le Compilateur Me Déteste ?",
+  "domain": "programming",
+  "mode": "fix-broken",
+  "difficulty": "intermediate",
+  "description": "Chaque erreur du compilateur Rust est un bug qu'il a empêché. Affrontez le borrow checker à travers 7 scénarios réels — moves, emprunts, lifetimes, closures et smart pointers — et comprenez pourquoi ces règles rendent Rust uniquement sûr.",
+  "xpReward": 340,
+  "estimatedMinutes": 55,
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "Valeur Déplacée Ici",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Ce code fonctionne en Python, JavaScript, Go — partout. En Rust, le compilateur dit 'value used after being moved'. Formatez un message d'accueil puis affichez le nom original. Corrigez-le.",
+        "code": "fn main() {\n    let name = String::from(\"Alice\");\n    let greeting = format!(\"Hello, {}\", name);\n    println!(\"Name is: {}\", name);\n    println!(\"Greeting: {}\", greeting);\n}",
+        "language": "rust",
+        "hint": "format!() prend la propriété (ownership) de name. Vous avez deux options : cloner la chaîne, ou passer une référence (&name) pour que format! emprunte au lieu de déplacer.",
+        "expectedConcepts": ["ownership", "move-semantics", "clone"],
+        "validationRegex": "\\.clone\\(\\)|&name",
+        "expectedFix": "name.clone()"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "L'Ownership — Un Propriétaire, Une Valeur",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## L'Ownership (Propriété)\n\nLa règle fondamentale de Rust : **chaque valeur a exactement un propriétaire**. Quand le propriétaire sort du scope, la valeur est libérée (mémoire désallouée).\n\n```rust\nlet s1 = String::from(\"hello\");\nlet s2 = s1;  // s1 est DÉPLACÉ vers s2. s1 n'est plus valide.\nprintln!(\"{}\", s1); // ERREUR DE COMPILATION : valeur utilisée après déplacement\n```\n\n### Pourquoi Déplacer au Lieu de Copier ?\n\n`String` stocke des données sur le **tas** (heap) — un pointeur, une longueur et une capacité sur la pile (stack), les octets réels dans la mémoire du tas. Si s1 et s2 possédaient les mêmes données du tas, qui les libère ? Les deux essaieraient → **double free** (corruption mémoire, vulnérabilité de sécurité).\n\nSolution Rust : après `let s2 = s1`, le compilateur invalide s1. Zéro coût à l'exécution, zéro bug.\n\n### Les Types de la Pile Se Copient Automatiquement\n\nLes types simples comme `i32`, `bool`, `f64`, `char` implémentent le trait `Copy` — ils vivent entièrement sur la pile et sont trivialement dupliqués :\n\n```rust\nlet x = 42;\nlet y = x;  // x est COPIÉ, pas déplacé\nprintln!(\"{}\", x); // OK ! i32 implémente Copy\n```\n\n### Solutions pour les Types du Tas\n\n```rust\n// 1. Clone — copie profonde explicite (nouvelle allocation)\nlet s2 = s1.clone();\n\n// 2. Emprunt — référence sans transfert de propriété\nlet s2 = &s1;\n\n// 3. Déplacer et restructurer\nfn greet(name: String) -> String {  // Prend la propriété, la rend\n    format!(\"Hello, {}\", name)\n}\n```",
+        "keyInsight": "Chaque valeur a exactement un propriétaire. L'assignation déplace les types du tas (transfert de propriété), copie les types de la pile. Cela empêche le double-free et l'use-after-free à la compilation, sans coût à l'exécution.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Pile vs Tas — pourquoi c'est important pour l'ownership",
+            "content": "**Pile (Stack)** : Données de taille fixe. L'allocation déplace juste le pointeur de pile (nanosecondes). La désallocation est automatique au retour de la fonction.\n\n**Tas (Heap)** : Données de taille dynamique (String, Vec, HashMap). L'allocation appelle l'allocateur mémoire de l'OS (microsecondes). La désallocation doit se produire exactement une fois.\n\n```\nPile :                  Tas :\n┌────────────┐         ┌───────────────┐\n│ ptr  ──────┼────────►│ h e l l o     │\n│ len: 5     │         └───────────────┘\n│ cap: 5     │\n└────────────┘\n    s1 (String)\n```\n\nAprès `let s2 = s1`, les données de la pile passent à s2, et s1 est invalidé. Les données du tas restent en place."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "Emprunt Mutable Interdit",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous voulez garder une référence au premier élément d'un vecteur, puis ajouter un nouvel élément. Le compilateur refuse : 'cannot borrow as mutable because it is also borrowed as immutable'. En quoi cela vous protège-t-il réellement ?",
+        "code": "fn main() {\n    let mut numbers = vec![1, 2, 3];\n    let first = &numbers[0];\n    numbers.push(4);\n    println!(\"First: {}\", first);\n}",
+        "language": "rust",
+        "hint": "push() peut réallouer la mémoire du vecteur (si la capacité est pleine). Si c'est le cas, `first` pointe maintenant vers de la mémoire libérée — un pointeur suspendu. Utilisez first avant de muter, ou restructurez le code.",
+        "expectedConcepts": ["borrowing", "mutable-references", "aliasing"],
+        "validationRegex": "println!.*first.*\\n\\s*numbers\\.push|let first = numbers\\[0\\]",
+        "expectedFix": "println!(\"First: {}\", first);\n    numbers.push(4);"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "title": "L'Emprunt — Des Références Sans Propriété",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Les Règles d'Emprunt\n\nRust applique deux règles sur les références à la compilation :\n\n1. **N'importe quel nombre de références immutables** (`&T`) — OU —\n2. **Exactement une référence mutable** (`&mut T`)\n\nJamais les deux simultanément pour les mêmes données.\n\n### Pourquoi Push() Causerait un Pointeur Suspendu\n\n```rust\nlet mut v = vec![1, 2, 3];  // capacité: 3, stocké à l'adresse 0x1000\nlet first = &v[0];           // first pointe vers 0x1000\nv.push(4);                   // capacité dépassée !\n// Vec alloue NOUVELLE mémoire à 0x2000, copie les données, libère 0x1000\n// first pointe maintenant vers la mémoire libérée à 0x1000 — POINTEUR SUSPENDU\nprintln!(\"{}\", first);       // Use-after-free !\n```\n\nEn C/C++, cela compile et cause un comportement indéfini. En Rust, le compilateur le rejette.\n\n### Le Problème Aliasing + Mutation\n\nLe borrow checker empêche la **mutation aliasée** — avoir à la fois une référence lisible et une référence modifiable vers les mêmes données. C'est la cause racine de :\n- Les data races (threads concurrents)\n- L'invalidation d'itérateurs (modifier une collection pendant l'itération)\n- Les pointeurs suspendus (réallouer pendant le référencement)\n\n### Non-Lexical Lifetimes (NLL)\n\nDepuis Rust 2018, les références se terminent à leur dernière utilisation, pas à la fin du scope :\n\n```rust\nlet mut v = vec![1, 2, 3];\nlet first = &v[0];\nprintln!(\"{}\", first);  // dernière utilisation de 'first' — l'emprunt se termine ici\nv.push(4);              // Maintenant c'est OK !\n```",
+        "keyInsight": "Vous pouvez avoir plusieurs lecteurs ou un seul écrivain, jamais les deux. Cette seule règle empêche les data races, l'invalidation d'itérateurs et les pointeurs suspendus à la compilation.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Data races et concurrence sans peur",
+            "content": "Un data race nécessite trois conditions :\n1. Deux threads ou plus accèdent aux mêmes données\n2. Au moins un écrit\n3. Pas de synchronisation\n\nLe borrow checker élimine les conditions 2+3 : `&mut T` n'est jamais aliasé. Envoyer des données entre threads nécessite `Send` ; les partager nécessite `Sync`. Le compilateur applique les deux.\n\n```rust\nuse std::thread;\nlet mut data = vec![1, 2, 3];\nthread::spawn(|| data.push(4)); // ERREUR : la closure peut survivre à data\nprintln!(\"{:?}\", data);          // Ce serait un data race\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-5",
+      "order": 5,
+      "title": "La Référence Suspendue",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Cette fonction crée une chaîne et retourne une référence vers elle. Le compilateur dit 'returns a reference to data owned by the current function'. La référence pendrait dans le vide — pointant vers de la mémoire libérée.",
+        "code": "fn create_greeting(name: &str) -> &str {\n    let greeting = format!(\"Hello, {}!\", name);\n    &greeting\n}\n\nfn main() {\n    let msg = create_greeting(\"Alice\");\n    println!(\"{}\", msg);\n}",
+        "language": "rust",
+        "hint": "Quand create_greeting() retourne, le String local est détruit. La référence ne pointerait vers rien. Retournez le String possédé à la place.",
+        "expectedConcepts": ["lifetimes", "dangling-references", "ownership-transfer"],
+        "validationRegex": "->\\s*String",
+        "expectedFix": "fn create_greeting(name: &str) -> String"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-6",
+      "order": 6,
+      "title": "Les Lifetimes — Combien de Temps Vivent les Références",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Les Lifetimes (Durées de Vie)\n\nChaque référence a une **lifetime** — la région de code où elle est valide. Le compilateur les suit automatiquement.\n\n### Le Problème de la Référence Suspendue\n\n```rust\nfn create_greeting() -> &str {\n    let s = String::from(\"Hello\");\n    &s  // s est détruit à la fin de la fonction\n}       // &s pointe maintenant vers de la mémoire libérée !\n```\n\nLa solution : retourner la valeur possédée pour que l'appelant contrôle sa durée de vie :\n\n```rust\nfn create_greeting() -> String {\n    String::from(\"Hello\")\n}  // La propriété est transférée à l'appelant. Pas de pendaison.\n```\n\n### Annotations de Lifetime Explicites\n\nQuand une fonction prend plusieurs références et en retourne une, le compilateur doit savoir quelle lifetime d'entrée le retour partage :\n\n```rust\n// Sans annotation : le compilateur ne sait pas quelle lifetime s'applique\nfn longer(s1: &str, s2: &str) -> &str { ... } // ERREUR\n\n// Avec lifetime 'a : le retour vit aussi longtemps que les deux entrées\nfn longer<'a>(s1: &'a str, s2: &'a str) -> &'a str {\n    if s1.len() > s2.len() { s1 } else { s2 }\n}\n```\n\n`'a` est un **paramètre de lifetime** — il dit 'la référence retournée est valide aussi longtemps que les deux références d'entrée le sont.'\n\n### Règles d'Élision des Lifetimes\n\nRust infère les lifetimes automatiquement pour les patterns courants :\n1. Chaque paramètre de référence reçoit sa propre lifetime\n2. S'il n'y a qu'une lifetime d'entrée, elle est utilisée pour la sortie\n3. S'il y a `&self`, la lifetime de self est utilisée pour la sortie\n\nVous n'écrivez des lifetimes explicites que quand ces règles sont ambiguës.",
+        "keyInsight": "Les lifetimes suivent combien de temps les références sont valides. Elles empêchent les pointeurs suspendus à la compilation. Les annotations explicites ('a) indiquent au compilateur quelles références partagent un scope de validité.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "La lifetime 'static",
+            "content": "`'static` signifie valide pour toute la durée du programme. Les littéraux de chaîne ont la lifetime `'static` car ils sont intégrés dans le binaire :\n\n```rust\nlet s: &'static str = \"Je vis éternellement\";\n```\n\n`'static` ne signifie pas 'vit sur le tas pour toujours' — ça signifie 'pourrait vivre aussi longtemps que le programme'. Les types possédés comme `String` satisfont aussi `T: 'static` car ils n'empruntent rien."
+          },
+          {
+            "title": "Les lifetimes dans les structs",
+            "content": "Si un struct contient une référence, il a besoin d'un paramètre de lifetime :\n\n```rust\nstruct Article<'a> {\n    title: &'a str,\n    content: &'a str,\n}\n\n// Le struct ne peut pas survivre aux données qu'il référence\nfn make_article() -> Article { // ERREUR : lifetime manquante\n    let title = String::from(\"Rust\");\n    Article { title: &title, content: \"...\" }\n    // title est détruit — Article pendrait dans le vide\n}\n```\n\nPréférez les types possédés dans les structs sauf si vous avez spécifiquement besoin de l'emprunt."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-7",
+      "order": 7,
+      "title": "Le Problème de Propriété des Closures",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous voulez lancer un thread qui utilise une variable locale. Le compilateur dit que la closure 'may outlive the current function'. Le thread pourrait s'exécuter après le retour de la fonction, rendant la référence suspendue.",
+        "code": "use std::thread;\n\nfn main() {\n    let message = String::from(\"hello from thread\");\n    \n    let handle = thread::spawn(|| {\n        println!(\"{}\", message);\n    });\n    \n    handle.join().unwrap();\n}",
+        "language": "rust",
+        "hint": "Le thread pourrait survivre à main(). Utilisez `move` pour transférer la propriété du String dans la closure — le thread possède alors les données.",
+        "expectedConcepts": ["closures", "move-semantics", "threads"],
+        "validationRegex": "thread::spawn\\(move",
+        "expectedFix": "thread::spawn(move || {"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-8",
+      "order": 8,
+      "title": "Les Closures et les Trois Traits Fn",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Closures et Propriété\n\nLes closures peuvent **capturer** des variables de leur environnement de trois façons, correspondant à trois traits :\n\n| Trait | Capture | Équivalent |\n|-------|---------|-----|\n| `Fn` | `&T` (emprunt immutable) | Lecture seule |\n| `FnMut` | `&mut T` (emprunt mutable) | Lecture + écriture |\n| `FnOnce` | `T` (prend la propriété) | Consomme |\n\nLe compilateur choisit automatiquement la capture la moins restrictive. `move` force le transfert de propriété :\n\n```rust\n// Sans move : la closure emprunte 'name'\nlet name = String::from(\"Alice\");\nlet greet = || println!(\"Hi, {}\", name);  // emprunte &name\ngreet();\nprintln!(\"{}\", name);  // Encore valide — seulement emprunté\n\n// Avec move : la closure prend la propriété\nlet greet = move || println!(\"Hi, {}\", name);  // possède name\ngreet();\nprintln!(\"{}\", name);  // ERREUR : valeur déplacée dans la closure\n```\n\n### Pourquoi les Threads Nécessitent `move`\n\n`thread::spawn` requiert `F: FnOnce() + Send + 'static`. La borne `'static` signifie que la closure ne peut pas emprunter de variables locales (elles seraient détruites au retour de la fonction). `move` transfère la propriété dans la closure, satisfaisant `'static`.\n\n### Closures comme Paramètres de Fonction\n\n```rust\nfn apply<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 {\n    f(x)\n}\n\nlet double = |x| x * 2;\napply(double, 21); // 42\n```",
+        "keyInsight": "Les closures capturent les variables de l'environnement par référence ou par valeur (move). Fn emprunte immutablement, FnMut emprunte mutablement, FnOnce prend la propriété. Les threads nécessitent move car ils peuvent survivre à l'appelant.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Fn vs FnMut vs FnOnce en pratique",
+            "content": "```rust\n// Fn — peut être appelé plusieurs fois, ne mute pas :\nlet items = vec![1, 2, 3];\nlet sum = items.iter().fold(0, |acc, x| acc + x);\n\n// FnMut — peut être appelé plusieurs fois, mute l'état :\nlet mut count = 0;\nlet mut inc = || count += 1;\ninc(); inc();\nassert_eq!(count, 2);\n\n// FnOnce — ne peut être appelé qu'une fois (consomme les données capturées) :\nlet name = String::from(\"Alice\");\nlet consume = || drop(name);  // déplace name dans drop\nconsume();\n// consume(); // ERREUR : déjà déplacé\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-9",
+      "order": 9,
+      "title": "La Gestion d'Erreur et l'Opérateur ?",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Cette fonction lit un fichier de configuration et parse un numéro de port. Elle utilise unwrap() partout — tout échec panique (crash). Refactorisez avec une gestion d'erreur propre en utilisant Result et l'opérateur ?.",
+        "code": "use std::fs;\n\nfn get_port() -> u16 {\n    let config = fs::read_to_string(\"config.txt\").unwrap();\n    let port: u16 = config.trim().parse().unwrap();\n    port\n}\n\nfn main() {\n    let port = get_port();\n    println!(\"Listening on port {}\", port);\n}",
+        "language": "rust",
+        "hint": "Retournez Result<u16, Box<dyn std::error::Error>> depuis get_port(). Remplacez .unwrap() par ?. L'opérateur ? retourne l'erreur anticipativement si quelque chose échoue.",
+        "expectedConcepts": ["result-type", "error-handling", "question-mark-operator"],
+        "validationRegex": "Result<.*>|\\?;",
+        "expectedFix": "fn get_port() -> Result<u16, Box<dyn std::error::Error>>"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-10",
+      "order": 10,
+      "title": "Result, Option et la Propriété des Erreurs",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## La Gestion d'Erreur en Rust\n\nRust n'a pas d'exceptions. Les erreurs sont des **valeurs** — représentées par `Result<T, E>` et `Option<T>` :\n\n```rust\nenum Result<T, E> {\n    Ok(T),    // Succès avec valeur\n    Err(E),   // Erreur avec détails\n}\n\nenum Option<T> {\n    Some(T),  // La valeur existe\n    None,     // La valeur est absente (comme null, mais sûr)\n}\n```\n\n### L'Opérateur ?\n\n`?` est du sucre syntaxique pour 'si c'est Err, retourner l'erreur immédiatement' :\n\n```rust\n// Sans ? :\nfn get_port() -> Result<u16, Box<dyn Error>> {\n    let config = match fs::read_to_string(\"config.txt\") {\n        Ok(s) => s,\n        Err(e) => return Err(Box::new(e)),\n    };\n    Ok(config.trim().parse::<u16>()?)\n}\n\n// Avec ? :\nfn get_port() -> Result<u16, Box<dyn Error>> {\n    let config = fs::read_to_string(\"config.txt\")?;\n    let port: u16 = config.trim().parse()?;\n    Ok(port)\n}\n```\n\n### Pourquoi Pas unwrap() ?\n\n`unwrap()` panique en cas d'erreur — le thread crash sans récupération possible. À utiliser uniquement dans :\n- Les tests (`#[test]`)\n- Les prototypes (pas le code de production)\n- Les cas où l'échec est vraiment impossible\n\n### Option — Le Null Bien Fait\n\nRust n'a pas de null. `Option<T>` vous force à gérer le cas None :\n\n```rust\nfn find_user(id: u32) -> Option<User> {\n    users.iter().find(|u| u.id == id).cloned()\n}\n\nmatch find_user(42) {\n    Some(user) => println!(\"Trouvé : {}\", user.name),\n    None => println!(\"Utilisateur non trouvé\"),\n}\n```",
+        "keyInsight": "Les erreurs sont des valeurs en Rust, pas des exceptions. Result<T,E> pour les erreurs récupérables, Option<T> pour l'absence. L'opérateur ? propage les erreurs de manière concise. unwrap() est pour les tests, pas la production.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Types d'erreur personnalisés avec thiserror",
+            "content": "Pour le code de production, définissez des erreurs spécifiques au domaine :\n\n```rust\nuse thiserror::Error;\n\n#[derive(Error, Debug)]\nenum AppError {\n    #[error(\"Fichier de config non trouvé : {0}\")]\n    ConfigMissing(#[from] std::io::Error),\n    \n    #[error(\"Port invalide : {0}\")]\n    InvalidPort(#[from] std::num::ParseIntError),\n    \n    #[error(\"Erreur de base de données : {0}\")]\n    Database(String),\n}\n```\n\n`#[from]` implémente automatiquement `From<io::Error>` pour `AppError`, permettant à `?` de convertir les erreurs automatiquement."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-11",
+      "order": 11,
+      "title": "Itérer et la Propriété",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous voulez itérer sur un vecteur pour afficher chaque élément, puis réutiliser le vecteur. Mais la boucle for prend la propriété et le vecteur a disparu après la boucle.",
+        "code": "fn main() {\n    let names = vec![\n        String::from(\"Alice\"),\n        String::from(\"Bob\"),\n        String::from(\"Charlie\"),\n    ];\n    \n    for name in names {\n        println!(\"Hello, {}\", name);\n    }\n    \n    // ERREUR : valeur utilisée après déplacement\n    println!(\"Total: {} users\", names.len());\n}",
+        "language": "rust",
+        "hint": "for name in names consomme le vecteur. Utilisez for name in &names pour itérer par référence. Chaque name sera &String au lieu de String.",
+        "expectedConcepts": ["iterators", "borrowing-in-loops", "into-iter-vs-iter"],
+        "validationRegex": "for\\s+name\\s+in\\s+&names",
+        "expectedFix": "for name in &names {"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-12",
+      "order": 12,
+      "title": "Les Itérateurs et les Trois Méthodes d'Itération",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Itérer avec la Propriété\n\nRust a trois façons d'itérer, correspondant aux trois formes d'accès :\n\n| Syntaxe | Méthode | Produit | Propriété |\n|---------|---------|---------|----------|\n| `for x in vec` | `.into_iter()` | `T` | Consomme le vecteur |\n| `for x in &vec` | `.iter()` | `&T` | Emprunte immutablement |\n| `for x in &mut vec` | `.iter_mut()` | `&mut T` | Emprunte mutablement |\n\n```rust\nlet names = vec![\"Alice\", \"Bob\", \"Charlie\"];\n\n// Emprunter — le vecteur est toujours utilisable après :\nfor name in &names {\n    println!(\"{}\", name);  // name est &str\n}\nprintln!(\"Count: {}\", names.len()); // OK !\n\n// Muter — modifier les éléments sur place :\nlet mut scores = vec![85, 92, 78];\nfor score in &mut scores {\n    *score += 10;  // Déréférencer pour modifier\n}\n\n// Consommer — prendre la propriété de chaque élément :\nfor name in names {\n    expensive_processing(name);  // name est String (possédé)\n}\n// names est maintenant vide/invalide\n```\n\n### Adaptateurs d'Itérateurs\n\nLes adaptateurs d'itérateurs de Rust sont des abstractions à coût zéro — ils compilent vers le même code machine que des boucles écrites à la main :\n\n```rust\nlet sum: i32 = numbers.iter()\n    .filter(|&&n| n > 0)\n    .map(|&n| n * 2)\n    .sum();\n```\n\n`.iter()` emprunte, donc `numbers` est toujours valide après. `.into_iter()` le consommerait.",
+        "keyInsight": "for x in vec consomme. for x in &vec emprunte. for x in &mut vec mute. Choisissez selon que vous avez besoin des données après la boucle. Les adaptateurs d'itérateurs maintiennent la même sémantique de propriété.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Collect et le turbofish",
+            "content": "`.collect()` transforme un itérateur en n'importe quelle collection. Le 'turbofish' (`::<>`) dit à Rust quelle collection :\n\n```rust\nlet evens: Vec<i32> = (0..100).filter(|n| n % 2 == 0).collect();\n// ou avec turbofish :\nlet evens = (0..100).filter(|n| n % 2 == 0).collect::<Vec<_>>();\n\n// Collecter dans d'autres types :\nuse std::collections::HashSet;\nlet unique: HashSet<_> = names.iter().collect();\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-13",
+      "order": 13,
+      "title": "Propriété Partagée — Quand un Seul Propriétaire ne Suffit Pas",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous construisez un graphe où plusieurs nœuds référencent la même configuration partagée. La propriété unique ne fonctionne pas — plusieurs nœuds doivent posséder la config. Le compilateur rejette votre code.",
+        "code": "struct Config {\n    max_connections: u32,\n    timeout_ms: u64,\n}\n\nstruct Node {\n    config: Config,\n    name: String,\n}\n\nfn main() {\n    let config = Config { max_connections: 100, timeout_ms: 5000 };\n    \n    let node_a = Node { config: config, name: String::from(\"A\") };\n    let node_b = Node { config: config, name: String::from(\"B\") };\n    // ERREUR : utilisation de la valeur déplacée 'config'\n}",
+        "language": "rust",
+        "hint": "Utilisez std::rc::Rc (Reference Counted) pour la propriété partagée. Rc::clone() crée une nouvelle référence sans copier les données. Chaque clone incrémente un compteur ; quand il atteint zéro, les données sont libérées.",
+        "expectedConcepts": ["smart-pointers", "rc", "shared-ownership"],
+        "validationRegex": "Rc::new|Rc<Config>|Rc::clone",
+        "expectedFix": "use std::rc::Rc;\nlet config = Rc::new(Config { ... });"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-14",
+      "order": 14,
+      "title": "La Vue d'Ensemble — L'Ownership comme Sûreté Mémoire",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Les Smart Pointers et les Échappatoires de l'Ownership\n\nQuand l'ownership unique est trop restrictif, Rust fournit des smart pointers :\n\n| Type | Objectif | Surcoût | Thread-safe |\n|------|---------|----------|-------------|\n| `Box<T>` | Allocation tas, propriétaire unique | Pointeur | Non (mais Send) |\n| `Rc<T>` | Propriété partagée (comptage de réf.) | Compteur de réf. | Non |\n| `Arc<T>` | Propriété partagée entre threads | Compteur atomique | Oui |\n| `RefCell<T>` | Mutabilité intérieure (vérification runtime) | Vérification runtime | Non |\n| `Mutex<T>` | Mutabilité intérieure entre threads | Verrou | Oui |\n\n### Quand Utiliser Chacun\n\n```rust\n// Box : types récursifs, gros types sur le tas\nstruct TreeNode {\n    left: Option<Box<TreeNode>>,\n    right: Option<Box<TreeNode>>,\n}\n\n// Rc : plusieurs propriétaires, même thread\nlet shared = Rc::new(Config { ... });\nlet node_a = Node { config: Rc::clone(&shared) };\nlet node_b = Node { config: Rc::clone(&shared) };\n\n// Arc + Mutex : plusieurs propriétaires, plusieurs threads\nlet counter = Arc::new(Mutex::new(0));\nlet c = Arc::clone(&counter);\nthread::spawn(move || { *c.lock().unwrap() += 1; });\n```\n\n## Le Tableau Complet de la Sûreté\n\n| Catégorie de Bug | Prévention |\n|-----------------|------------|\n| Use after free | Ownership + sémantique de move |\n| Double free | Règle du propriétaire unique |\n| Pointeurs suspendus | Suivi des lifetimes |\n| Data races | Règles d'emprunt + Send/Sync |\n| Déréférencement null | Option<T> au lieu de null |\n| Dépassement de buffer | Vérification de bornes (Vec, slices) |\n| Erreurs non gérées | Result<T,E> + avertissements compilateur |\n\nEn C/C++, cela cause un comportement indéfini — crashs, exploits de sécurité, corruption silencieuse. En Rust, **tout** est prévenu à la compilation, sans coût runtime.",
+        "keyInsight": "Ownership, emprunt, lifetimes et smart pointers forment un système unifié qui élimine les bugs mémoire, les data races et les erreurs null à la compilation. Box pour la propriété unique sur le tas, Rc/Arc pour le partage, RefCell/Mutex pour la mutabilité intérieure.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "La phase 'combattre le borrow checker'",
+            "content": "Chaque développeur Rust passe par une phase de combat avec le borrow checker. Patterns courants qui aident :\n\n1. **Cloner d'abord, optimiser après** : Utilisez .clone() librement en apprenant. Optimisez quand le profiling montre que ça compte.\n2. **Préférer les types possédés dans les structs** : `String` plutôt que `&str`, `Vec<T>` plutôt que `&[T]`.\n3. **Utiliser les itérateurs au lieu des boucles d'index** : Ils gèrent l'emprunt correctement par défaut.\n4. **Restructurer, pas combattre** : Si le borrow checker rejette votre code, ça signifie généralement que votre flux de données a un vrai problème.\n\nAprès ~3 mois, le borrow checker devient un allié — il attrape des bugs que vous ne saviez pas que vous étiez sur le point d'écrire."
+          },
+          {
+            "title": "Quand utiliser unsafe",
+            "content": "`unsafe` n'est pas maléfique — c'est un contrat. Vous dites au compilateur : 'J'ai vérifié ces invariants manuellement.'\n\nUtilisations légitimes :\n- FFI (appeler des bibliothèques C)\n- Code critique en performance où les vérifications de bornes comptent\n- Implémenter des structures de données (listes chaînées, files concurrentes)\n\nRègles :\n- Garder les blocs unsafe minuscules\n- Documenter les invariants\n- Envelopper dans des APIs sûres\n- La grande majorité du code Rust devrait être safe"
+          }
+        ]
+      },
+      "xpReward": 10
+    }
+  ]
+}

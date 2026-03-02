@@ -1,0 +1,277 @@
+{
+  "id": "sql-query-detective",
+  "slug": "sql-query-detective",
+  "title": "SQL : Le Détective de Requêtes",
+  "domain": "systems",
+  "mode": "fix-broken",
+  "difficulty": "intermediate",
+  "description": "Vos requêtes de base de données retournent des résultats erronés, plantent sur les cas limites ou sont 100x plus lentes que nécessaire. Corrigez 7 requêtes cassées — NULLs, JOINs, GROUP BY, fonctions fenêtre, index — et découvrez comment SQL pense réellement vos données.",
+  "xpReward": 320,
+  "estimatedMinutes": 45,
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "NULL N'Égale Rien",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous devez trouver tous les utilisateurs qui n'ont PAS renseigné de numéro de téléphone. Cette requête retourne zéro ligne, même si vous savez que beaucoup d'utilisateurs ont un téléphone NULL. Quelque chose cloche profondément dans la comparaison avec NULL.",
+        "code": "-- Table: users (id, name, email, phone)\n-- Task: Find users with no phone number\n\nSELECT name, email\nFROM users\nWHERE phone = NULL;\n\n-- Returns: 0 rows (wrong!)\n-- Expected: All users where phone is not set",
+        "language": "sql",
+        "hint": "NULL n'est pas une valeur — il signifie 'inconnu'. NULL = NULL s'évalue à NULL (inconnu), pas TRUE. Utilisez IS NULL au lieu de = NULL.",
+        "expectedConcepts": ["null-semantics", "three-valued-logic", "is-null"],
+        "validationRegex": "IS\\s+NULL",
+        "expectedFix": "WHERE phone IS NULL"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "Logique à Trois Valeurs — NULL N'est Pas une Valeur",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## NULL en SQL\n\nNULL ne signifie pas 'chaîne vide', 'zéro' ou 'faux'. Il signifie **inconnu** — l'absence d'une valeur. SQL utilise une **logique à trois valeurs** : TRUE, FALSE et UNKNOWN.\n\n### Les Comparaisons avec NULL Retournent Toujours UNKNOWN\n\n```sql\nNULL = NULL    → UNKNOWN (pas TRUE !)\nNULL != NULL   → UNKNOWN\nNULL > 5       → UNKNOWN\nNULL = 0       → UNKNOWN\nNULL = ''      → UNKNOWN\n```\n\nLes clauses WHERE n'incluent que les lignes où la condition est TRUE. Les lignes UNKNOWN sont exclues :\n\n```sql\n-- Retourne les lignes où phone est une valeur connue égale à NULL ?\n-- C'est UNKNOWN — donc zéro ligne.\nWHERE phone = NULL   -- Retourne toujours 0 ligne !\n\n-- Correct :\nWHERE phone IS NULL       -- Trouver les NULLs\nWHERE phone IS NOT NULL   -- Exclure les NULLs\n```\n\n### Propagation du NULL\n\nNULL est 'contagieux' — toute opération impliquant NULL produit NULL :\n\n```sql\nSELECT 5 + NULL       → NULL\nSELECT 'hello' || NULL → NULL  (en SQL standard)\nSELECT NULL AND TRUE   → UNKNOWN\nSELECT NULL OR TRUE    → TRUE  (seule exception !)\n```\n\n### Fonctions d'Agrégation et NULL\n\n```sql\n-- SUM, AVG, COUNT(colonne) ignorent les NULLs :\nSELECT AVG(salary) FROM employees;  -- Ignore les salaires NULL\nSELECT COUNT(phone) FROM users;     -- Compte seulement les phones non-NULL\nSELECT COUNT(*) FROM users;         -- Compte toutes les lignes (y compris NULLs)\n```\n\n### Fonctions Sûres pour NULL\n\n```sql\n-- COALESCE : retourner la première valeur non-NULL\nSELECT COALESCE(phone, 'N/A') FROM users;\n\n-- NULLIF : retourner NULL si les valeurs sont égales\nSELECT NULLIF(denominator, 0);  -- Empêche la division par zéro\n\n-- CASE WHEN : gestion explicite de NULL\nSELECT CASE WHEN phone IS NULL THEN 'Pas de téléphone' ELSE phone END;\n```",
+        "keyInsight": "NULL signifie 'inconnu', pas 'vide'. NULL = NULL est UNKNOWN, pas TRUE. Utilisez toujours IS NULL / IS NOT NULL pour les vérifications de NULL. Les NULLs se propagent dans les expressions et sont ignorés par les agrégats.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "NOT IN avec des NULLs — un piège célèbre",
+            "content": "```sql\n-- Trouver les utilisateurs PAS dans la table managers\nSELECT * FROM users WHERE id NOT IN (SELECT manager_id FROM teams);\n```\n\nSi N'IMPORTE quel manager_id est NULL, la sous-requête retourne un ensemble contenant NULL. `NOT IN (1, 2, NULL)` s'évalue à UNKNOWN pour chaque valeur (même les valeurs clairement différentes de 1 ou 2). **Zéro ligne retournée !**\n\n```sql\n-- Alternatives sûres :\nSELECT * FROM users WHERE id NOT IN (\n    SELECT manager_id FROM teams WHERE manager_id IS NOT NULL\n);\n\n-- Ou utilisez NOT EXISTS (sûr pour NULL) :\nSELECT * FROM users u\nWHERE NOT EXISTS (SELECT 1 FROM teams t WHERE t.manager_id = u.id);\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "Les Commandes Manquantes",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Votre rapport client est censé montrer TOUS les clients et leurs commandes. Mais les clients qui n'ont passé aucune commande sont absents des résultats. Le SELECT semble correct — pourquoi certains clients disparaissent-ils ?",
+        "code": "-- Tables:\n-- customers (id, name, email, registered_at)\n-- orders (id, customer_id, total, created_at)\n\n-- Task: Show ALL customers with their order count\nSELECT \n    c.name,\n    c.email,\n    COUNT(o.id) AS order_count,\n    COALESCE(SUM(o.total), 0) AS total_spent\nFROM customers c\nJOIN orders o ON c.id = o.customer_id\nGROUP BY c.id, c.name, c.email\nORDER BY total_spent DESC;\n\n-- Problem: customers with 0 orders don't appear!",
+        "language": "sql",
+        "hint": "INNER JOIN ne retourne que les lignes qui correspondent dans les DEUX tables. Les clients sans commande n'ont pas de ligne correspondante dans orders. Utilisez LEFT JOIN pour garder tous les clients, même ceux sans commande.",
+        "expectedConcepts": ["join-types", "left-join", "inner-join"],
+        "validationRegex": "LEFT\\s+(OUTER\\s+)?JOIN",
+        "expectedFix": "LEFT JOIN orders o ON c.id = o.customer_id"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "title": "Types de JOIN — Comment les Tables se Connectent",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Les Types de JOIN SQL\n\nLes JOINs combinent des lignes de deux tables basées sur une colonne liée.\n\n### Les Quatre Types de JOIN\n\n```\ncustomers:          orders:\n┌────┬───────┐      ┌────┬─────────────┬───────┐\n│ id │ name  │      │ id │ customer_id │ total │\n├────┼───────┤      ├────┼─────────────┼───────┤\n│  1 │ Alice │      │  1 │     1       │  50   │\n│  2 │ Bob   │      │  2 │     1       │  30   │\n│  3 │ Carol │      │  3 │     3       │  20   │\n└────┴───────┘      └────┴─────────────┴───────┘\n```\n\n**INNER JOIN** — uniquement les lignes correspondantes :\n```sql\nSELECT * FROM customers c\nINNER JOIN orders o ON c.id = o.customer_id;\n-- Alice-50, Alice-30, Carol-20  (Bob n'a pas de commandes → exclu)\n```\n\n**LEFT JOIN** — toutes les lignes gauches + lignes droites correspondantes :\n```sql\nSELECT * FROM customers c\nLEFT JOIN orders o ON c.id = o.customer_id;\n-- Alice-50, Alice-30, Bob-NULL, Carol-20  (Bob inclus avec NULLs)\n```\n\n**RIGHT JOIN** — toutes les lignes droites + lignes gauches correspondantes (rarement utilisé).\n\n**FULL OUTER JOIN** — toutes les lignes des deux côtés.\n\n### Quand Utiliser Chaque Type\n\n| Objectif | Type de JOIN |\n|----------|-------------|\n| Montrer uniquement les enregistrements correspondants | INNER JOIN |\n| Montrer TOUS les éléments de la table gauche (même sans correspondance) | LEFT JOIN |\n| Trouver les enregistrements sans correspondance ('qui n'a PAS de commande ?') | LEFT JOIN + WHERE right.id IS NULL |\n| Combiner deux listes indépendantes | FULL OUTER JOIN ou CROSS JOIN |\n\n### Pattern Anti-Join : Trouver les Enregistrements Manquants\n\n```sql\n-- Clients qui n'ont JAMAIS commandé :\nSELECT c.name, c.email\nFROM customers c\nLEFT JOIN orders o ON c.id = o.customer_id\nWHERE o.id IS NULL;\n```\n\nCeci s'appelle un **anti-join** — l'un des patterns SQL les plus utiles.",
+        "keyInsight": "INNER JOIN exclut les lignes sans correspondance. LEFT JOIN garde toutes les lignes de la table gauche, remplissant de NULLs là où il n'y a pas de correspondance. Utilisez LEFT JOIN + WHERE IS NULL pour trouver les enregistrements sans correspondance.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Performance et optimisation des JOINs",
+            "content": "Les JOINs peuvent être coûteux. La base de données utilise ces stratégies :\n\n1. **Nested Loop Join** : Pour les petites tables ou joints indexés. O(n×m) sans index, O(n×log(m)) avec index.\n2. **Hash Join** : Pour les grandes tables non indexées. Construit une table de hachage sur la plus petite table, sonde avec la plus grande.\n3. **Merge Join** : Pour les données pré-triées. Parcourt les deux tables triées en parallèle.\n\nOptimisations clés :\n- Indexez toujours les colonnes de clé étrangère (`customer_id` dans orders)\n- Mettez la plus petite table en premier dans le JOIN (l'optimiseur gère généralement ça)\n- Filtrez avec WHERE avant de joindre quand c'est possible\n- Évitez de joindre sur des expressions (`ON LOWER(a.name) = LOWER(b.name)`) — ne peut pas utiliser les index"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-5",
+      "order": 5,
+      "title": "Le GROUP BY Cassé",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous voulez trouver la commande la plus récente de chaque client. Mais la requête retourne une commande aléatoire pour chaque client, pas la plus récente. Le MAX(created_at) est correct, mais l'order_id ne correspond pas.",
+        "code": "-- Task: Find each customer's most recent order\nSELECT \n    c.name,\n    o.id AS latest_order_id,\n    o.total,\n    MAX(o.created_at) AS latest_order_date\nFROM customers c\nJOIN orders o ON c.id = o.customer_id\nGROUP BY c.id, c.name;\n\n-- Problem: o.id and o.total come from a RANDOM row\n-- in the group, not the row with MAX(created_at)!",
+        "language": "sql",
+        "hint": "Sélectionner des colonnes non agrégées (o.id, o.total) absentes du GROUP BY est un comportement indéfini en SQL — la base choisit une ligne arbitraire. Utilisez une sous-requête ou une fonction fenêtre (ROW_NUMBER) pour obtenir la ligne réelle avec la date max.",
+        "expectedConcepts": ["group-by-semantics", "window-functions", "row-number"],
+        "validationRegex": "ROW_NUMBER|RANK|DENSE_RANK|ORDER BY.*DESC.*LIMIT|subquery|WHERE.*created_at\\s*=",
+        "expectedFix": "Use ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC) to identify the most recent order"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-6",
+      "order": 6,
+      "title": "Règles du GROUP BY et Fonctions Fenêtre",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## La Règle du GROUP BY\n\nChaque colonne dans le SELECT doit soit :\n1. Être dans la clause GROUP BY, OU\n2. Être à l'intérieur d'une fonction d'agrégation (COUNT, SUM, MAX, MIN, AVG)\n\n```sql\n-- FAUX : o.total n'est pas dans GROUP BY et pas agrégé\nSELECT c.name, o.total, COUNT(*)\nFROM customers c JOIN orders o ON c.id = o.customer_id\nGROUP BY c.name;  -- Quel o.total ? Il y en a plusieurs par groupe !\n\n-- CORRECT : agréger o.total\nSELECT c.name, SUM(o.total), COUNT(*)\nFROM customers c JOIN orders o ON c.id = o.customer_id\nGROUP BY c.name;\n```\n\nMySQL (sans ONLY_FULL_GROUP_BY) choisit silencieusement une ligne aléatoire. PostgreSQL et la plupart des bases rejettent la requête.\n\n## Fonctions Fenêtre — Agrégation Sans Groupement\n\nLes fonctions fenêtre calculent des valeurs sur les lignes liées à la ligne courante, **sans fusionner les lignes** :\n\n```sql\nSELECT \n    name,\n    order_id,\n    total,\n    created_at,\n    ROW_NUMBER() OVER (\n        PARTITION BY customer_id \n        ORDER BY created_at DESC\n    ) AS rn\nFROM orders;\n```\n\nCeci attribue `rn = 1` à la commande la plus récente de chaque client.\n\n### Résoudre 'Le Plus Récent Par Groupe'\n\n```sql\nWITH ranked AS (\n    SELECT \n        c.name,\n        o.id AS order_id,\n        o.total,\n        o.created_at,\n        ROW_NUMBER() OVER (\n            PARTITION BY c.id \n            ORDER BY o.created_at DESC\n        ) AS rn\n    FROM customers c\n    JOIN orders o ON c.id = o.customer_id\n)\nSELECT name, order_id, total, created_at\nFROM ranked\nWHERE rn = 1;\n```\n\n### Fonctions Fenêtre Courantes\n\n| Fonction | Objectif |\n|----------|--------|\n| `ROW_NUMBER()` | Numéro séquentiel unique par partition |\n| `RANK()` | Même numéro pour les ex-aequo, puis saut |\n| `DENSE_RANK()` | Même numéro pour les ex-aequo, sans saut |\n| `LAG(col, n)` | Valeur de n lignes avant |\n| `LEAD(col, n)` | Valeur de n lignes après |\n| `SUM() OVER()` | Total cumulé |\n| `AVG() OVER()` | Moyenne glissante |",
+        "keyInsight": "Chaque colonne non agrégée doit être dans GROUP BY. Les fonctions fenêtre (ROW_NUMBER, RANK, LAG, LEAD) permettent de calculer des valeurs par groupe sans fusionner les lignes. Les CTEs (WITH) rendent les requêtes complexes lisibles.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "HAVING vs WHERE",
+            "content": "WHERE filtre les lignes individuelles **avant** le regroupement. HAVING filtre les groupes **après** l'agrégation :\n\n```sql\n-- WHERE : filtrer les lignes avant le regroupement\nSELECT department, AVG(salary)\nFROM employees\nWHERE hire_date > '2020-01-01'  -- Filtre : seulement les embauches récentes\nGROUP BY department;\n\n-- HAVING : filtrer les groupes après l'agrégation\nSELECT department, AVG(salary)\nFROM employees\nGROUP BY department\nHAVING AVG(salary) > 50000;  -- Filtre : seulement les départements bien payés\n```\n\nOrdre d'exécution SQL :\n1. FROM + JOIN\n2. WHERE\n3. GROUP BY\n4. HAVING\n5. SELECT\n6. ORDER BY\n7. LIMIT"
+          },
+          {
+            "title": "Fenêtres de calcul — ROWS vs RANGE",
+            "content": "Les fonctions fenêtre opèrent sur un 'cadre' de lignes :\n\n```sql\n-- Total cumulé :\nSELECT \n    date, \n    revenue,\n    SUM(revenue) OVER (ORDER BY date\n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS running_total\nFROM daily_sales;\n\n-- Moyenne glissante sur 7 jours :\nSELECT \n    date,\n    revenue,\n    AVG(revenue) OVER (ORDER BY date\n        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n    ) AS avg_7day\nFROM daily_sales;\n```\n\nROWS compte les lignes physiques. RANGE regroupe les lignes avec des valeurs ORDER BY égales."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-7",
+      "order": 7,
+      "title": "La Requête Qui Ralentit Chaque Jour",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Cette requête recherche les commandes des 30 derniers jours. Elle fonctionnait bien avec 1 000 lignes mais prend maintenant 8 secondes avec 5 millions de lignes. La base fait un scan complet de table. Ajoutez le bon index pour la rendre rapide.",
+        "code": "-- This query takes 8 seconds on 5M rows:\nSELECT \n    o.id,\n    c.name,\n    o.total,\n    o.created_at\nFROM orders o\nJOIN customers c ON c.id = o.customer_id\nWHERE o.status = 'completed'\n  AND o.created_at >= DATE('now', '-30 days')\nORDER BY o.created_at DESC\nLIMIT 50;\n\n-- EXPLAIN shows: SCAN TABLE orders (5,000,000 rows examined)\n-- How do you make this query use an index?",
+        "language": "sql",
+        "hint": "Créez un index composite sur les colonnes utilisées dans WHERE et ORDER BY. L'ordre compte : mettez les conditions d'égalité d'abord (status), puis les conditions de plage (created_at). CREATE INDEX idx_orders_status_date ON orders(status, created_at);",
+        "expectedConcepts": ["indexes", "query-optimization", "btree"],
+        "validationRegex": "CREATE\\s+INDEX|idx_",
+        "expectedFix": "CREATE INDEX idx_orders_status_date ON orders(status, created_at);"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-8",
+      "order": 8,
+      "title": "Les Index — Comment les Bases Trouvent les Données Rapidement",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Comment Fonctionnent les Index\n\nSans index, la base doit scanner chaque ligne (scan complet de table). Avec un index, elle utilise un **B-tree** (arbre équilibré) pour sauter directement au bon emplacement — comme l'index d'un livre vs lire chaque page.\n\n### Performance du B-Tree\n\n| Opération | Sans Index | Avec Index |\n|-----------|-----------|------------|\n| Trouver une ligne | O(n) = 5M lignes scannées | O(log n) ≈ 23 recherches |\n| Scan de plage (30 jours) | O(n) = 5M lignes | O(log n + k) = 23 + lignes correspondantes |\n\n### Index Composites\n\nUn index composite sur `(status, created_at)` est comme un annuaire trié par nom de famille, puis prénom :\n\n```sql\nCREATE INDEX idx_orders_status_date ON orders(status, created_at);\n```\n\nCet index aide les requêtes qui filtrent par :\n- `status` seul ✓\n- `status` ET `created_at` ✓✓✓ (meilleur cas)\n- `created_at` seul ✗✗ (ne peut pas utiliser — mauvais ordre)\n\n### Règle d'Ordre des Colonnes d'Index\n\nMettez les colonnes dans cet ordre :\n1. Colonnes d'**égalité** d'abord (`status = 'completed'`)\n2. Colonnes de **plage** ensuite (`created_at >= ...`)\n3. Colonnes **ORDER BY** en dernier (si elles suivent la plage)\n\n```sql\n-- Cet index couvre parfaitement notre requête :\nCREATE INDEX idx_orders_status_date ON orders(status, created_at);\n\n-- La base peut :\n-- 1. Sauter à status = 'completed' (recherche B-tree)\n-- 2. Scanner en avant depuis le seuil de date (déjà trié)\n-- 3. Retourner les lignes dans l'ordre (pas de tri séparé nécessaire)\n```\n\n### Index Couvrants\n\nSi l'index contient toutes les colonnes dont la requête a besoin, la base ne touche jamais la table :\n\n```sql\n-- Inclure total dans l'index pour un index couvrant :\nCREATE INDEX idx_covering ON orders(status, created_at, total);\n-- Maintenant la requête entière lit seulement l'index — encore plus rapide\n```\n\n### Quand NE PAS Indexer\n\n- Colonnes à très faible cardinalité (booléen avec répartition 50/50)\n- Tables de moins de 1000 lignes (le scan est assez rapide)\n- Colonnes sur lesquelles vous ne filtrez/triez jamais\n- Chaque index ralentit INSERT/UPDATE/DELETE (doit mettre à jour l'arbre)",
+        "keyInsight": "Les index transforment les scans O(n) en recherches O(log n) grâce aux B-trees. Les index composites doivent avoir les colonnes d'égalité avant les colonnes de plage. Chaque index accélère les lectures mais ralentit les écritures. Utilisez EXPLAIN pour vérifier que la base utilise votre index.",
+        "formula": "$\\text{Recherches B-tree} = \\lceil \\log_B(n) \\rceil$ où $B$ ≈ 100 (facteur de branchement) et $n$ = nombre de lignes",
+        "expandableSections": [
+          {
+            "title": "Utiliser EXPLAIN pour diagnostiquer les requêtes",
+            "content": "EXPLAIN montre le plan d'exécution de la requête :\n\n```sql\nEXPLAIN QUERY PLAN\nSELECT * FROM orders\nWHERE status = 'completed' AND created_at >= '2024-01-01';\n\n-- Sans index :\n-- SCAN TABLE orders (~5M lignes examinées)\n\n-- Avec index :\n-- SEARCH TABLE orders USING INDEX idx_orders_status_date\n-- (status=? AND created_at>?)\n```\n\nÉléments clés à rechercher :\n- **SCAN** = scan complet de table (lent) vs **SEARCH USING INDEX** (rapide)\n- **rows examined** — moins c'est mieux\n- **Using temporary** / **Using filesort** → envisager d'ajouter un index\n- **Covering index** → meilleur cas, pas d'accès table nécessaire"
+          },
+          {
+            "title": "Types d'index au-delà du B-tree",
+            "content": "La plupart des bases supportent des types d'index spécialisés :\n\n| Type | Cas d'Usage |\n|------|----------|\n| **B-tree** (défaut) | Usage général : égalité, plage, tri |\n| **Hash** | Égalité exacte uniquement (plus rapide que B-tree pour =) |\n| **GIN** (PostgreSQL) | Champs JSONB, tableaux, recherche plein texte |\n| **GiST** (PostgreSQL) | Données géométriques, plages |\n| **BRIN** (PostgreSQL) | Très grandes tables avec données naturellement ordonnées |\n\n```sql\n-- PostgreSQL : index GIN pour requêtes JSONB\nCREATE INDEX idx_metadata ON events USING GIN (metadata);\nSELECT * FROM events WHERE metadata @> '{\"type\": \"click\"}';\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-9",
+      "order": 9,
+      "title": "La Requête N+1 Mortelle",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Ce code applicatif exécute 1 requête pour récupérer les commandes, puis 1 requête par commande pour récupérer le nom du client. Avec 1000 commandes, ça fait 1001 requêtes. La page met 12 secondes à charger. Réécrivez en une seule requête efficace.",
+        "code": "-- What the application does (pseudocode):\n-- orders = SELECT * FROM orders WHERE status = 'pending';\n-- for each order:\n--   customer = SELECT name FROM customers WHERE id = order.customer_id;\n--   display(order, customer.name)\n\n-- This runs 1001 queries for 1000 orders!\n-- Rewrite as ONE query that gets all the data:\n\n-- Your query here:\nSELECT *\nFROM orders\nWHERE status = 'pending';",
+        "language": "sql",
+        "hint": "Utilisez un JOIN pour récupérer les commandes et les noms des clients en une seule requête. SELECT o.*, c.name FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.status = 'pending';",
+        "expectedConcepts": ["n-plus-one", "join-optimization", "query-planning"],
+        "validationRegex": "JOIN\\s+customers",
+        "expectedFix": "SELECT o.id, o.total, o.created_at, c.name AS customer_name\nFROM orders o\nJOIN customers c ON c.id = o.customer_id\nWHERE o.status = 'pending';"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-10",
+      "order": 10,
+      "title": "Patterns de Requêtes — N+1, Batch et JOIN",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Le Problème de Requête N+1\n\nLe problème N+1 est l'anti-pattern de performance de base de données le plus courant :\n\n```\n1 requête pour récupérer N éléments\n+ N requêtes pour récupérer les données liées de chaque élément\n= N+1 requêtes au total\n```\n\n### Pourquoi C'est Dévastateur\n\n| Approche | Requêtes | Allers-retours réseau | Temps (1000 commandes) |\n|----------|---------|-------------------|--------------------|\n| N+1 | 1001 | 1001 | ~5-12 secondes |\n| JOIN | 1 | 1 | ~10 ms |\n| Batch IN | 2 | 2 | ~15 ms |\n\nChaque requête a un surcoût : aller-retour réseau (~1-5ms), parsing de requête, génération du plan. Avec 1001 requêtes, le surcoût seul est de 1-5 secondes.\n\n### Trois Solutions\n\n**1. JOIN (Meilleur pour les données liées)**\n```sql\nSELECT o.*, c.name\nFROM orders o\nJOIN customers c ON c.id = o.customer_id\nWHERE o.status = 'pending';\n```\n\n**2. Batch avec IN (Quand le JOIN est maladroit)**\n```sql\n-- Requête 1 : Récupérer les commandes\nSELECT * FROM orders WHERE status = 'pending';\n-- Collecter les customer_ids : [1, 2, 5, 7, ...]\n\n-- Requête 2 : Récupérer tous les clients d'un coup\nSELECT * FROM customers WHERE id IN (1, 2, 5, 7, ...);\n```\n\n**3. Sous-requête (Pour l'agrégation filtrée)**\n```sql\nSELECT c.name,\n    (SELECT COUNT(*) FROM orders WHERE customer_id = c.id) AS order_count\nFROM customers c;\n-- Sous-requête corrélée — s'exécute une fois par client\n-- Mieux en tant que JOIN avec GROUP BY pour les grands jeux de données\n```\n\n### ORMs et N+1\n\nChaque ORM (Django, SQLAlchemy, Prisma, TypeORM) peut produire des requêtes N+1 par défaut :\n```python\n# Django N+1 :\nfor order in Order.objects.filter(status='pending'):\n    print(order.customer.name)  # Requête séparée par commande !\n\n# Correction avec select_related (JOIN) :\nfor order in Order.objects.filter(status='pending').select_related('customer'):\n    print(order.customer.name)  # Requête unique avec JOIN\n```",
+        "keyInsight": "Le problème N+1 cause 1000 requêtes quand 1 suffirait. Corrigez avec des JOINs, des requêtes batch IN, ou le chargement eager de l'ORM (select_related, include, populate). Un seul JOIN est typiquement 100-1000x plus rapide que N+1.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Détecter N+1 en production",
+            "content": "Symptômes :\n- Temps de chargement proportionnel à la taille des données (100 éléments = 1s, 1000 éléments = 10s)\n- La base montre beaucoup de patterns de requêtes identiques avec des paramètres différents\n- Épuisement du pool de connexions sous charge\n\nOutils de détection :\n- **Django** : django-debug-toolbar montre le nombre de requêtes par requête\n- **SQLAlchemy** : définir `echo=True` pour logger toutes les requêtes\n- **PostgreSQL** : `pg_stat_statements` montre la fréquence des requêtes\n- **Général** : Toute requête émettant >10 requêtes SQL est suspecte"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-11",
+      "order": 11,
+      "title": "Le Cross Join Accidentel",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Ce rapport devrait montrer chaque produit avec son nom de catégorie. Au lieu de cela, il retourne 10 000 lignes alors qu'il n'y a que 100 produits et 100 catégories. Chaque produit est apparié avec chaque catégorie. Corrigez le produit cartésien.",
+        "code": "-- Tables:\n-- products (id, name, price, category_id) — 100 rows\n-- categories (id, name) — 100 rows\n\nSELECT \n    p.name AS product_name,\n    p.price,\n    c.name AS category_name\nFROM products p, categories c\nWHERE p.price > 50\nORDER BY p.price DESC;\n\n-- Returns: 10,000 rows (100 × 100) — every product paired with every category!",
+        "language": "sql",
+        "hint": "La clause FROM avec virgules de l'ancien style (FROM products, categories) sans condition de jointure crée un CROSS JOIN — chaque ligne appariée avec chaque ligne. Ajoutez la condition de jointure : WHERE p.category_id = c.id. Mieux encore, utilisez la syntaxe JOIN explicite.",
+        "expectedConcepts": ["cross-join", "cartesian-product", "join-conditions"],
+        "validationRegex": "JOIN\\s+categories|p\\.category_id\\s*=\\s*c\\.id",
+        "expectedFix": "FROM products p\nJOIN categories c ON p.category_id = c.id\nWHERE p.price > 50"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-12",
+      "order": 12,
+      "title": "Produits Cartésiens et Conditions de Jointure",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Le Produit Cartésien\n\nQuand vous listez des tables dans FROM sans condition de jointure, SQL crée toutes les combinaisons possibles de lignes :\n\n```sql\nFROM products p, categories c  -- 100 × 100 = 10 000 lignes\n```\n\nC'est un **CROSS JOIN** (ou produit cartésien). Avec trois tables :\n```sql\nFROM products p, categories c, suppliers s\n-- 100 × 100 × 50 = 500 000 lignes !\n```\n\n### Ancien Style vs JOIN Explicite\n\n```sql\n-- Ancien style (jointure implicite) : facile d'oublier accidentellement des conditions\nSELECT * \nFROM products p, categories c\nWHERE p.category_id = c.id AND p.price > 50;\n\n-- Moderne (JOIN explicite) : conditions séparées, plus difficile de se tromper\nSELECT *\nFROM products p\nJOIN categories c ON p.category_id = c.id\nWHERE p.price > 50;\n```\n\n### Pourquoi le JOIN Explicite Est Meilleur\n\n1. **Conditions de jointure (ON)** et **conditions de filtre (WHERE)** sont séparées\n2. Impossible d'oublier une condition de jointure par accident\n3. Supporte la syntaxe LEFT/RIGHT/FULL\n4. Auto-documentant : la relation est évidente\n\n### Quand le CROSS JOIN Est Intentionnel\n\nRarement, vous voulez vraiment chaque combinaison :\n\n```sql\n-- Générer un calendrier : chaque date × chaque type de quart\nSELECT d.date, s.shift_name\nFROM dates d\nCROSS JOIN shifts s\nWHERE d.date BETWEEN '2024-01-01' AND '2024-01-31';\n\n-- Générer une matrice : chaque produit × chaque région\nSELECT p.name, r.name, 0 AS sales\nFROM products p\nCROSS JOIN regions r;\n```",
+        "keyInsight": "FROM avec virgules et sans condition de jointure crée un produit cartésien (chaque ligne × chaque ligne). Utilisez toujours la syntaxe JOIN explicite avec conditions ON. Le CROSS JOIN ne devrait être qu'intentionnel.",
+        "formula": "$\\text{Lignes du produit cartésien} = |A| \\times |B| \\times |C| \\times \\ldots$",
+        "expandableSections": [
+          {
+            "title": "Auto-jointures — joindre une table à elle-même",
+            "content": "Parfois vous devez comparer des lignes au sein de la même table :\n\n```sql\n-- Trouver les employés qui gagnent plus que leur manager :\nSELECT \n    e.name AS employe,\n    e.salary AS salaire_employe,\n    m.name AS manager,\n    m.salary AS salaire_manager\nFROM employees e\nJOIN employees m ON e.manager_id = m.id\nWHERE e.salary > m.salary;\n\n-- Trouver les paires de produits dans la même catégorie :\nSELECT a.name, b.name, a.category_id\nFROM products a\nJOIN products b ON a.category_id = b.category_id AND a.id < b.id;\n-- a.id < b.id empêche les doublons (A,B) et (B,A)\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-13",
+      "order": 13,
+      "title": "La Transaction Qui Tourne Mal",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Ce virement bancaire débite un compte et crédite un autre. Mais si le deuxième UPDATE échoue (vérification de fonds insuffisants, erreur réseau), l'argent disparaît — débité mais jamais crédité. Enveloppez dans une transaction pour le rendre atomique.",
+        "code": "-- Transfer $500 from account 1 to account 2\n\nUPDATE accounts SET balance = balance - 500 WHERE id = 1;\n-- What if the server crashes RIGHT HERE?\nUPDATE accounts SET balance = balance + 500 WHERE id = 2;\n\n-- If the second statement fails:\n-- Account 1: -$500 (debited) ✓\n-- Account 2:  $0   (never credited) ✗\n-- $500 has vanished!",
+        "language": "sql",
+        "hint": "Enveloppez les deux instructions dans BEGIN TRANSACTION ... COMMIT. Si quoi que ce soit échoue entre BEGIN et COMMIT, appelez ROLLBACK — toutes les modifications sont annulées atomiquement. L'argent se déplace complètement ou pas du tout.",
+        "expectedConcepts": ["transactions", "atomicity", "acid"],
+        "validationRegex": "BEGIN|TRANSACTION|COMMIT|ROLLBACK",
+        "expectedFix": "BEGIN TRANSACTION;\nUPDATE accounts SET balance = balance - 500 WHERE id = 1;\nUPDATE accounts SET balance = balance + 500 WHERE id = 2;\nCOMMIT;"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-14",
+      "order": 14,
+      "title": "Transactions et ACID — Rendre les Bases Fiables",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Les Propriétés ACID\n\nChaque transaction de base de données garantit quatre propriétés :\n\n### Atomicité — Tout ou Rien\n\n```sql\nBEGIN TRANSACTION;\n  UPDATE accounts SET balance = balance - 500 WHERE id = 1;\n  UPDATE accounts SET balance = balance + 500 WHERE id = 2;\nCOMMIT;\n-- Si QUOI QUE CE SOIT échoue : les deux modifications sont annulées\n-- L'argent ne disparaît jamais et ne se duplique jamais\n```\n\nLa base écrit les modifications dans un **write-ahead log (WAL)** d'abord. À la récupération après crash, elle rejoue les transactions committées et annule les non committées.\n\n### Cohérence — Les Règles Ne Sont Jamais Violées\n\n```sql\n-- Contrainte : le solde ne doit jamais devenir négatif\nALTER TABLE accounts ADD CHECK (balance >= 0);\n\nBEGIN;\n  UPDATE accounts SET balance = balance - 500 WHERE id = 1;\n  -- Si cela rendrait le solde négatif : violation de contrainte → auto-rollback\nCOMMIT;\n```\n\n### Isolation — Les Transactions Concurrentes N'Interfèrent Pas\n\n| Niveau | Lectures Sales | Lectures Non Répétables | Lignes Fantômes |\n|--------|--------------|---------------------|-------------|\n| READ UNCOMMITTED | Oui | Oui | Oui |\n| READ COMMITTED | Non | Oui | Oui |\n| REPEATABLE READ | Non | Non | Oui |\n| SERIALIZABLE | Non | Non | Non |\n\nLa plupart des bases utilisent par défaut **READ COMMITTED** — vous ne voyez que les données committées des autres transactions.\n\n### Durabilité — Les Données Committées Survivent aux Crashs\n\nUne fois que COMMIT retourne succès, les données sont sur le disque. Même si le serveur perd l'alimentation 1ms plus tard, la transaction est préservée.\n\n## Patterns de Transactions Pratiques\n\n```sql\n-- Pattern 1 : Try/catch avec rollback\nBEGIN;\n  -- Plusieurs opérations...\n  INSERT INTO audit_log (action, user_id) VALUES ('transfer', 1);\n  UPDATE accounts SET balance = balance - 500 WHERE id = 1;\n  UPDATE accounts SET balance = balance + 500 WHERE id = 2;\nCOMMIT;\n-- En cas d'erreur : ROLLBACK;\n\n-- Pattern 2 : Verrouillage optimiste\nSELECT balance, version FROM accounts WHERE id = 1;\n-- L'application traite...\nUPDATE accounts \n  SET balance = new_balance, version = version + 1\n  WHERE id = 1 AND version = old_version;\n-- Si 0 lignes modifiées : quelqu'un d'autre l'a changé → réessayer\n```",
+        "keyInsight": "Les transactions rendent plusieurs opérations atomiques — toutes réussissent ou toutes échouent. ACID (Atomicité, Cohérence, Isolation, Durabilité) sont les quatre garanties que chaque base de données fiable fournit. Utilisez toujours les transactions pour les modifications de données multi-étapes.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Deadlocks et ordre de verrouillage",
+            "content": "Deux transactions peuvent se bloquer mutuellement (deadlock) — chacune attendant un verrou que l'autre détient :\n\n```\nTransaction A :               Transaction B :\nVERROUILLE compte 1 ✓         VERROUILLE compte 2 ✓\nVERROUILLE compte 2 ⏳ (attend)  VERROUILLE compte 1 ⏳ (attend)\n  → DEADLOCK !\n```\n\nLa base détecte cela et tue une transaction (la fait rollback).\n\nPrévention : verrouillez toujours les ressources dans le même ordre :\n```sql\n-- Toujours verrouiller l'ID le plus petit en premier :\nBEGIN;\n  SELECT * FROM accounts WHERE id = 1 FOR UPDATE;  -- Verrouiller 1 d'abord\n  SELECT * FROM accounts WHERE id = 2 FOR UPDATE;  -- Puis verrouiller 2\n  -- Maintenant faire le virement\nCOMMIT;\n```"
+          },
+          {
+            "title": "Quand utiliser SERIALIZABLE",
+            "content": "SERIALIZABLE est le niveau d'isolation le plus strict — les transactions se comportent comme si elles s'exécutaient une à la fois. Il prévient toutes les anomalies mais réduit la concurrence.\n\nÀ utiliser pour :\n- Les calculs financiers (les soldes doivent être exacts)\n- La gestion de stock (ne peut pas survendre)\n- Les systèmes de réservation (ne peut pas réserver en double)\n\n```sql\nSET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nBEGIN;\n  SELECT available_seats FROM flights WHERE id = 42;\n  -- Si >= 1 :\n  UPDATE flights SET available_seats = available_seats - 1 WHERE id = 42;\n  INSERT INTO bookings (flight_id, passenger_id) VALUES (42, 100);\nCOMMIT;\n```\n\nAvec deux réservations concurrentes pour le dernier siège, SERIALIZABLE garantit qu'une seule réussit."
+          }
+        ]
+      },
+      "xpReward": 5
+    }
+  ]
+}

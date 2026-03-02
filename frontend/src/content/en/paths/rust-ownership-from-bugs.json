@@ -1,0 +1,277 @@
+{
+  "id": "rust-ownership-from-bugs",
+  "slug": "rust-ownership-from-bugs",
+  "title": "Rust Ownership: Why Does the Compiler Hate Me?",
+  "domain": "programming",
+  "mode": "fix-broken",
+  "difficulty": "intermediate",
+  "description": "Every error the Rust compiler throws is a bug it prevented. Fight the borrow checker through 7 real scenarios — moves, borrows, lifetimes, closures, and smart pointers — and understand why these rules make Rust uniquely safe.",
+  "xpReward": 340,
+  "estimatedMinutes": 55,
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "Value Moved Here",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "This code works in Python, JavaScript, Go — everywhere. In Rust, the compiler says 'value used after being moved'. Format a greeting and then print the original name. Fix it.",
+        "code": "fn main() {\n    let name = String::from(\"Alice\");\n    let greeting = format!(\"Hello, {}\", name);\n    println!(\"Name is: {}\", name);\n    println!(\"Greeting: {}\", greeting);\n}",
+        "language": "rust",
+        "hint": "format!() takes ownership of name. You have two options: clone the string, or pass a reference (&name) so format! borrows instead of moving.",
+        "expectedConcepts": ["ownership", "move-semantics", "clone"],
+        "validationRegex": "\\.clone\\(\\)|&name",
+        "expectedFix": "name.clone()"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "Ownership — One Owner, One Value",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Ownership\n\nRust's foundational rule: **every value has exactly one owner**. When the owner goes out of scope, the value is dropped (memory freed).\n\n```rust\nlet s1 = String::from(\"hello\");\nlet s2 = s1;  // s1 is MOVED to s2. s1 is now invalid.\nprintln!(\"{}\", s1); // COMPILE ERROR: value used after move\n```\n\n### Why Move Instead of Copy?\n\n`String` stores data on the **heap** — a pointer, length, and capacity on the stack, actual bytes in heap memory. If both s1 and s2 owned the same heap data, who frees it? Both would try → **double free** (memory corruption, security vulnerability).\n\nRust's solution: after `let s2 = s1`, the compiler invalidates s1. Zero runtime cost, zero bugs.\n\n### Stack Types Copy Automatically\n\nSimple types like `i32`, `bool`, `f64`, `char` implement the `Copy` trait — they live entirely on the stack and are trivially duplicated:\n\n```rust\nlet x = 42;\nlet y = x;  // x is COPIED, not moved\nprintln!(\"{}\", x); // Fine! i32 implements Copy\n```\n\n### Solutions for Heap Types\n\n```rust\n// 1. Clone — explicit deep copy (new heap allocation)\nlet s2 = s1.clone();\n\n// 2. Borrow — reference without ownership transfer\nlet s2 = &s1;\n\n// 3. Move and restructure — think about who needs ownership\nfn greet(name: String) -> String {  // Takes ownership, returns it\n    format!(\"Hello, {}\", name)\n}\n```",
+        "keyInsight": "Every value has exactly one owner. Assignment moves heap types (ownership transfer), copies stack types. This prevents double-free and use-after-free at compile time with zero runtime cost.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Stack vs Heap — why it matters for ownership",
+            "content": "**Stack**: Fixed-size data. Allocation is just moving the stack pointer (nanoseconds). Deallocation is automatic when the function returns.\n\n**Heap**: Dynamic-size data (String, Vec, HashMap). Allocation calls the OS memory allocator (microseconds). Deallocation must happen exactly once.\n\n```\nStack:                  Heap:\n┌────────────┐         ┌───────────────┐\n│ ptr  ──────┼────────►│ h e l l o     │\n│ len: 5     │         └───────────────┘\n│ cap: 5     │\n└────────────┘\n    s1 (String)\n```\n\nAfter `let s2 = s1`, the stack data moves to s2, and s1 is invalidated. The heap data stays put."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "Cannot Borrow as Mutable",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You want to keep a reference to the first element of a vector, then push a new element. The compiler refuses: 'cannot borrow as mutable because it is also borrowed as immutable'. Why is this actually protecting you?",
+        "code": "fn main() {\n    let mut numbers = vec![1, 2, 3];\n    let first = &numbers[0];\n    numbers.push(4);\n    println!(\"First: {}\", first);\n}",
+        "language": "rust",
+        "hint": "push() might reallocate the vector's memory (if capacity is full). If it does, `first` now points to freed memory — a dangling pointer. Use first before mutating, or restructure the code.",
+        "expectedConcepts": ["borrowing", "mutable-references", "aliasing"],
+        "validationRegex": "println!.*first.*\\n\\s*numbers\\.push|let first = numbers\\[0\\]",
+        "expectedFix": "println!(\"First: {}\", first);\n    numbers.push(4);"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "title": "Borrowing — References Without Ownership",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## The Borrowing Rules\n\nRust enforces two rules about references at compile time:\n\n1. **Any number of immutable references** (`&T`) — OR —\n2. **Exactly one mutable reference** (`&mut T`)\n\nNever both simultaneously for the same data.\n\n### Why Push() Would Cause a Dangling Pointer\n\n```rust\nlet mut v = vec![1, 2, 3];  // capacity: 3, stored at address 0x1000\nlet first = &v[0];           // first points to 0x1000\nv.push(4);                   // capacity exceeded!\n// Vec allocates NEW memory at 0x2000, copies data, frees 0x1000\n// first now points to freed memory at 0x1000 — DANGLING POINTER\nprintln!(\"{}\", first);       // Use-after-free!\n```\n\nIn C/C++, this compiles and causes undefined behavior. In Rust, the compiler rejects it.\n\n### The Aliasing + Mutation Problem\n\nThe borrow checker prevents **aliased mutation** — having both a readable reference and a writable reference to the same data. This is the root cause of:\n- Data races (concurrent threads)\n- Iterator invalidation (modifying a collection while iterating)\n- Dangling pointers (reallocating while referencing)\n\n### Non-Lexical Lifetimes (NLL)\n\nSince Rust 2018, references end at their last use, not at the end of the scope:\n\n```rust\nlet mut v = vec![1, 2, 3];\nlet first = &v[0];\nprintln!(\"{}\", first);  // last use of 'first' — borrow ends here\nv.push(4);              // Now this is fine!\n```",
+        "keyInsight": "You can have many readers or one writer, never both. This single rule prevents data races, iterator invalidation, and dangling pointers at compile time.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Data races and fearless concurrency",
+            "content": "A data race requires three conditions:\n1. Two or more threads access the same data\n2. At least one is writing\n3. No synchronization\n\nThe borrow checker eliminates condition 2+3: `&mut T` is never aliased. Sending data between threads requires `Send`; sharing requires `Sync`. The compiler enforces both.\n\n```rust\nuse std::thread;\nlet mut data = vec![1, 2, 3];\nthread::spawn(|| data.push(4)); // ERROR: closure may outlive data\nprintln!(\"{:?}\", data);          // Would be a data race\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-5",
+      "order": 5,
+      "title": "The Dangling Reference",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "This function creates a string and returns a reference to it. The compiler says 'returns a reference to data owned by the current function'. The reference would dangle — point to freed memory.",
+        "code": "fn create_greeting(name: &str) -> &str {\n    let greeting = format!(\"Hello, {}!\", name);\n    &greeting\n}\n\nfn main() {\n    let msg = create_greeting(\"Alice\");\n    println!(\"{}\", msg);\n}",
+        "language": "rust",
+        "hint": "When create_greeting() returns, the local String is dropped. The reference would point to nothing. Return the owned String instead.",
+        "expectedConcepts": ["lifetimes", "dangling-references", "ownership-transfer"],
+        "validationRegex": "->\\s*String",
+        "expectedFix": "fn create_greeting(name: &str) -> String"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-6",
+      "order": 6,
+      "title": "Lifetimes — How Long References Live",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Lifetimes\n\nEvery reference has a **lifetime** — the region of code where it's valid. The compiler tracks these automatically.\n\n### The Dangling Reference Problem\n\n```rust\nfn create_greeting() -> &str {\n    let s = String::from(\"Hello\");\n    &s  // s is dropped at end of function\n}       // &s now points to freed memory!\n```\n\nThe fix: return the owned value so the caller controls its lifetime:\n\n```rust\nfn create_greeting() -> String {\n    String::from(\"Hello\")\n}  // Ownership transfers to caller. No dangling.\n```\n\n### Explicit Lifetime Annotations\n\nWhen a function takes multiple references and returns one, the compiler needs to know which input lifetime the output shares:\n\n```rust\n// Without annotation: compiler can't tell which input's lifetime applies\nfn longer(s1: &str, s2: &str) -> &str { ... } // ERROR\n\n// With lifetime 'a: output lives as long as both inputs\nfn longer<'a>(s1: &'a str, s2: &'a str) -> &'a str {\n    if s1.len() > s2.len() { s1 } else { s2 }\n}\n```\n\nThe `'a` is a **lifetime parameter** — it says 'the returned reference is valid for as long as both input references are.'\n\n### Lifetime Elision Rules\n\nRust infers lifetimes automatically for common patterns:\n1. Each reference parameter gets its own lifetime\n2. If there's one input lifetime, it's used for output\n3. If there's `&self`, self's lifetime is used for output\n\nYou only write explicit lifetimes when these rules are ambiguous.",
+        "keyInsight": "Lifetimes track how long references are valid. They prevent dangling pointers at compile time. Explicit annotations ('a) tell the compiler which references share a validity scope.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "The 'static lifetime",
+            "content": "`'static` means valid for the entire program duration. String literals have `'static` lifetime because they're embedded in the binary:\n\n```rust\nlet s: &'static str = \"I live forever\";\n```\n\n`'static` doesn't mean 'lives on the heap forever' — it means 'could live as long as the program'. Owned types like `String` also satisfy `T: 'static` because they don't borrow from anything."
+          },
+          {
+            "title": "Lifetimes in structs",
+            "content": "If a struct holds a reference, it needs a lifetime parameter:\n\n```rust\nstruct Article<'a> {\n    title: &'a str,\n    content: &'a str,\n}\n\n// The struct can't outlive the data it references\nfn make_article() -> Article { // ERROR: missing lifetime\n    let title = String::from(\"Rust\");\n    Article { title: &title, content: \"...\" }\n    // title is dropped — Article would dangle\n}\n```\n\nPrefer owned types in structs unless you specifically need borrowing."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-7",
+      "order": 7,
+      "title": "The Closure Ownership Problem",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You want to spawn a thread that uses a local variable. The compiler says the closure 'may outlive the current function'. The thread could run after the function returns, making the reference dangle.",
+        "code": "use std::thread;\n\nfn main() {\n    let message = String::from(\"hello from thread\");\n    \n    let handle = thread::spawn(|| {\n        println!(\"{}\", message);\n    });\n    \n    handle.join().unwrap();\n}",
+        "language": "rust",
+        "hint": "The thread might outlive main(). Use `move` to transfer ownership of the String into the closure — the thread then owns the data.",
+        "expectedConcepts": ["closures", "move-semantics", "threads"],
+        "validationRegex": "thread::spawn\\(move",
+        "expectedFix": "thread::spawn(move || {"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-8",
+      "order": 8,
+      "title": "Closures and the Three Fn Traits",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Closures and Ownership\n\nClosures can **capture** variables from their environment in three ways, corresponding to three traits:\n\n| Trait | Capture | Equivalent To |\n|-------|---------|-----|\n| `Fn` | `&T` (immutable borrow) | Read only |\n| `FnMut` | `&mut T` (mutable borrow) | Read + write |\n| `FnOnce` | `T` (take ownership) | Consume |\n\nThe compiler automatically chooses the least restrictive capture. `move` forces ownership transfer:\n\n```rust\n// Without move: closure borrows 'name'\nlet name = String::from(\"Alice\");\nlet greet = || println!(\"Hi, {}\", name);  // borrows &name\ngreet();\nprintln!(\"{}\", name);  // Still valid — only borrowed\n\n// With move: closure takes ownership\nlet greet = move || println!(\"Hi, {}\", name);  // owns name\ngreet();\nprintln!(\"{}\", name);  // ERROR: value moved into closure\n```\n\n### Why Threads Need `move`\n\n`thread::spawn` requires `F: FnOnce() + Send + 'static`. The `'static` bound means the closure can't borrow local variables (they'd be dropped when the function returns). `move` transfers ownership into the closure, satisfying `'static`.\n\n### Closures as Function Parameters\n\n```rust\nfn apply<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 {\n    f(x)\n}\n\nlet double = |x| x * 2;\napply(double, 21); // 42\n```",
+        "keyInsight": "Closures capture environment variables by reference or by value (move). Fn borrows immutably, FnMut borrows mutably, FnOnce takes ownership. Threads require move because they may outlive the caller.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Fn vs FnMut vs FnOnce in practice",
+            "content": "```rust\n// Fn — can call many times, doesn't mutate:\nlet items = vec![1, 2, 3];\nlet sum = items.iter().fold(0, |acc, x| acc + x);\n\n// FnMut — can call many times, mutates state:\nlet mut count = 0;\nlet mut inc = || count += 1;\ninc(); inc();\nassert_eq!(count, 2);\n\n// FnOnce — can only call once (consumes captured data):\nlet name = String::from(\"Alice\");\nlet consume = || drop(name);  // moves name into drop\nconsume();\n// consume(); // ERROR: already moved\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-9",
+      "order": 9,
+      "title": "Error Handling and the ? Operator",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "This function reads a config file and parses a port number. It uses unwrap() everywhere — any failure panics (crashes). Refactor to use proper error handling with Result and the ? operator.",
+        "code": "use std::fs;\n\nfn get_port() -> u16 {\n    let config = fs::read_to_string(\"config.txt\").unwrap();\n    let port: u16 = config.trim().parse().unwrap();\n    port\n}\n\nfn main() {\n    let port = get_port();\n    println!(\"Listening on port {}\", port);\n}",
+        "language": "rust",
+        "hint": "Return Result<u16, Box<dyn std::error::Error>> from get_port(). Replace .unwrap() with ?. The ? operator returns the error early if something fails.",
+        "expectedConcepts": ["result-type", "error-handling", "question-mark-operator"],
+        "validationRegex": "Result<.*>|\\?;",
+        "expectedFix": "fn get_port() -> Result<u16, Box<dyn std::error::Error>>"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-10",
+      "order": 10,
+      "title": "Result, Option, and Ownership of Errors",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Error Handling in Rust\n\nRust has no exceptions. Errors are **values** — represented by `Result<T, E>` and `Option<T>`:\n\n```rust\nenum Result<T, E> {\n    Ok(T),    // Success with value\n    Err(E),   // Error with details\n}\n\nenum Option<T> {\n    Some(T),  // Value exists\n    None,     // Value is absent (like null, but safe)\n}\n```\n\n### The ? Operator\n\n`?` is syntactic sugar for 'if this is Err, return the error immediately':\n\n```rust\n// Without ?:\nfn get_port() -> Result<u16, Box<dyn Error>> {\n    let config = match fs::read_to_string(\"config.txt\") {\n        Ok(s) => s,\n        Err(e) => return Err(Box::new(e)),\n    };\n    let port = match config.trim().parse::<u16>() {\n        Ok(p) => p,\n        Err(e) => return Err(Box::new(e)),\n    };\n    Ok(port)\n}\n\n// With ?:\nfn get_port() -> Result<u16, Box<dyn Error>> {\n    let config = fs::read_to_string(\"config.txt\")?;\n    let port: u16 = config.trim().parse()?;\n    Ok(port)\n}\n```\n\n### Why Not unwrap()?\n\n`unwrap()` panics on error — the thread crashes with no recovery. Use it only in:\n- Tests (`#[test]` functions)\n- Prototypes (not production code)\n- Cases where failure is truly impossible\n\n### Option — Null Done Right\n\nRust has no null. `Option<T>` forces you to handle the None case:\n\n```rust\nfn find_user(id: u32) -> Option<User> {\n    users.iter().find(|u| u.id == id).cloned()\n}\n\nmatch find_user(42) {\n    Some(user) => println!(\"Found: {}\", user.name),\n    None => println!(\"User not found\"),\n}\n```",
+        "keyInsight": "Errors are values in Rust, not exceptions. Result<T,E> for recoverable errors, Option<T> for absence. The ? operator propagates errors concisely. unwrap() is for tests, not production.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Custom error types with thiserror",
+            "content": "For production code, define domain-specific errors:\n\n```rust\nuse thiserror::Error;\n\n#[derive(Error, Debug)]\nenum AppError {\n    #[error(\"Config file not found: {0}\")]\n    ConfigMissing(#[from] std::io::Error),\n    \n    #[error(\"Invalid port: {0}\")]\n    InvalidPort(#[from] std::num::ParseIntError),\n    \n    #[error(\"Database error: {0}\")]\n    Database(String),\n}\n\nfn get_port() -> Result<u16, AppError> {\n    let config = fs::read_to_string(\"config.txt\")?; // Auto-converts io::Error\n    let port: u16 = config.trim().parse()?;          // Auto-converts ParseIntError\n    Ok(port)\n}\n```\n\n`#[from]` auto-implements `From<io::Error>` for `AppError`, letting `?` convert errors automatically."
+          },
+          {
+            "title": "Combinators — functional error handling",
+            "content": "Both `Result` and `Option` have powerful combinators:\n\n```rust\n// Map the success value:\nlet port: Result<u16, _> = config.parse::<u16>().map(|p| p + 1000);\n\n// Chain fallible operations:\nlet user = find_user(42)\n    .and_then(|u| verify_active(u))\n    .map(|u| u.name)\n    .unwrap_or(String::from(\"anonymous\"));\n\n// Provide default:\nlet port = config.parse::<u16>().unwrap_or(8080);\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-11",
+      "order": 11,
+      "title": "Iterating and Ownership",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You want to iterate over a vector to print each element, then use the vector again. But the for loop takes ownership and the vector is gone after the loop.",
+        "code": "fn main() {\n    let names = vec![\n        String::from(\"Alice\"),\n        String::from(\"Bob\"),\n        String::from(\"Charlie\"),\n    ];\n    \n    for name in names {\n        println!(\"Hello, {}\", name);\n    }\n    \n    // ERROR: value used after move\n    println!(\"Total: {} users\", names.len());\n}",
+        "language": "rust",
+        "hint": "for name in names consumes the vector. Use for name in &names to iterate by reference. Each name will be &String instead of String.",
+        "expectedConcepts": ["iterators", "borrowing-in-loops", "into-iter-vs-iter"],
+        "validationRegex": "for\\s+name\\s+in\\s+&names",
+        "expectedFix": "for name in &names {"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-12",
+      "order": 12,
+      "title": "Iterators and the Three Iteration Methods",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Iterating with Ownership\n\nRust has three ways to iterate, corresponding to the three forms of access:\n\n| Syntax | Method | Yields | Ownership |\n|--------|--------|--------|----------|\n| `for x in vec` | `.into_iter()` | `T` | Consumes the vector |\n| `for x in &vec` | `.iter()` | `&T` | Borrows immutably |\n| `for x in &mut vec` | `.iter_mut()` | `&mut T` | Borrows mutably |\n\n```rust\nlet names = vec![\"Alice\", \"Bob\", \"Charlie\"];\n\n// Borrow — vector is still usable after:\nfor name in &names {\n    println!(\"{}\", name);  // name is &str\n}\nprintln!(\"Count: {}\", names.len()); // Fine!\n\n// Mutate — modify elements in place:\nlet mut scores = vec![85, 92, 78];\nfor score in &mut scores {\n    *score += 10;  // Dereference to modify\n}\n\n// Consume — take ownership of each element:\nfor name in names {\n    expensive_processing(name);  // name is String (owned)\n}\n// names is now empty/invalid\n```\n\n### Iterator Adapters\n\nRust's iterator adapters are zero-cost abstractions — they compile to the same machine code as hand-written loops:\n\n```rust\nlet sum: i32 = numbers.iter()\n    .filter(|&&n| n > 0)\n    .map(|&n| n * 2)\n    .sum();\n```\n\n`.iter()` borrows, so `numbers` is still valid after. `.into_iter()` would consume it.",
+        "keyInsight": "for x in vec consumes. for x in &vec borrows. for x in &mut vec mutates. Choose based on whether you need the data after the loop. Iterator adapters maintain the same ownership semantics.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Collect and the turbofish",
+            "content": "`.collect()` transforms an iterator into any collection. The 'turbofish' (`::<>`) tells Rust which collection:\n\n```rust\nlet evens: Vec<i32> = (0..100).filter(|n| n % 2 == 0).collect();\n// or with turbofish:\nlet evens = (0..100).filter(|n| n % 2 == 0).collect::<Vec<_>>();\n\n// Collect into other types:\nuse std::collections::HashSet;\nlet unique: HashSet<_> = names.iter().collect();\n\n// Collect Result<Vec<T>, E> from Vec<Result<T, E>>:\nlet parsed: Result<Vec<i32>, _> = [\"1\", \"2\", \"x\"]\n    .iter().map(|s| s.parse::<i32>()).collect();\n// Err(ParseIntError) — stops at first error\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-13",
+      "order": 13,
+      "title": "Shared Ownership — When One Owner Isn't Enough",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You're building a graph where multiple nodes reference the same shared configuration. Single ownership doesn't work — multiple nodes need to own the config. The compiler rejects your code.",
+        "code": "struct Config {\n    max_connections: u32,\n    timeout_ms: u64,\n}\n\nstruct Node {\n    config: Config,\n    name: String,\n}\n\nfn main() {\n    let config = Config { max_connections: 100, timeout_ms: 5000 };\n    \n    let node_a = Node { config: config, name: String::from(\"A\") };\n    let node_b = Node { config: config, name: String::from(\"B\") };\n    // ERROR: use of moved value 'config'\n}",
+        "language": "rust",
+        "hint": "Use std::rc::Rc (Reference Counted) for shared ownership. Rc::clone() creates a new reference without copying the data. Each clone increments a counter; when it reaches zero, the data is freed.",
+        "expectedConcepts": ["smart-pointers", "rc", "shared-ownership"],
+        "validationRegex": "Rc::new|Rc<Config>|Rc::clone",
+        "expectedFix": "use std::rc::Rc;\nlet config = Rc::new(Config { ... });"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-14",
+      "order": 14,
+      "title": "The Full Picture — Ownership as Memory Safety",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Smart Pointers and the Ownership Escape Hatches\n\nWhen single ownership is too restrictive, Rust provides smart pointers:\n\n| Type | Purpose | Overhead | Thread-safe |\n|------|---------|----------|------------|\n| `Box<T>` | Heap allocation, single owner | Pointer | No (but Send) |\n| `Rc<T>` | Shared ownership (reference counted) | Reference count | No |\n| `Arc<T>` | Shared ownership across threads | Atomic ref count | Yes |\n| `RefCell<T>` | Interior mutability (runtime borrow check) | Runtime check | No |\n| `Mutex<T>` | Interior mutability across threads | Lock | Yes |\n\n### When to Use Each\n\n```rust\n// Box: recursive types, large types on heap\nstruct TreeNode {\n    left: Option<Box<TreeNode>>,\n    right: Option<Box<TreeNode>>,\n}\n\n// Rc: multiple owners, same thread\nlet shared = Rc::new(Config { ... });\nlet node_a = Node { config: Rc::clone(&shared) };\nlet node_b = Node { config: Rc::clone(&shared) };\n\n// Arc + Mutex: multiple owners, multiple threads\nlet counter = Arc::new(Mutex::new(0));\nlet c = Arc::clone(&counter);\nthread::spawn(move || { *c.lock().unwrap() += 1; });\n```\n\n## The Complete Safety Picture\n\n| Bug Category | Prevention |\n|-------------|------------|\n| Use after free | Ownership + move semantics |\n| Double free | Single owner rule |\n| Dangling pointers | Lifetime tracking |\n| Data races | Borrow rules + Send/Sync |\n| Null dereference | Option<T> instead of null |\n| Buffer overflow | Bounds checking (Vec, slices) |\n| Unhandled errors | Result<T,E> + compiler warnings |\n\nIn C/C++, these cause undefined behavior — crashes, security exploits, silent corruption. In garbage-collected languages (Java, Go, Python), the GC prevents memory bugs but can't prevent data races.\n\nRust prevents ALL of them at compile time, with zero runtime cost.\n\n### The Trade-Off\n\nThe borrow checker has a learning curve. Code that's trivial in Python may require restructuring in Rust. But once it compiles, you have guarantees no other mainstream language provides.",
+        "keyInsight": "Ownership, borrowing, lifetimes, and smart pointers form a unified system that eliminates memory bugs, data races, and null errors at compile time. Box for single heap ownership, Rc/Arc for sharing, RefCell/Mutex for interior mutability.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "The 'fighting the borrow checker' phase",
+            "content": "Every Rust developer goes through a phase of fighting the borrow checker. Common patterns that help:\n\n1. **Clone first, optimize later**: Use .clone() freely while learning. Optimize once profiling shows it matters.\n2. **Prefer owned types in structs**: `String` over `&str`, `Vec<T>` over `&[T]`.\n3. **Use iterators instead of index loops**: They handle borrowing correctly by default.\n4. **Restructure, don't fight**: If the borrow checker rejects your code, it usually means your data flow has a real problem. Restructure rather than reaching for unsafe.\n\nAfter ~3 months, the borrow checker becomes an ally — it catches bugs you didn't know you were about to write."
+          },
+          {
+            "title": "When to use unsafe",
+            "content": "`unsafe` is not evil — it's a contract. You're telling the compiler: 'I've verified these invariants manually.'\n\nLegitimate uses:\n- FFI (calling C libraries)\n- Performance-critical code where bounds checks matter\n- Implementing data structures (linked lists, concurrent queues)\n\nRules:\n- Keep unsafe blocks tiny\n- Document invariants\n- Wrap in safe APIs\n- The vast majority of Rust code should be safe"
+          }
+        ]
+      },
+      "xpReward": 10
+    }
+  ]
+}

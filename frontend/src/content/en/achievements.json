@@ -1,0 +1,65 @@
+[
+  {
+    "id": "first-bug",
+    "slug": "first-bug",
+    "title": "First Bug Squashed",
+    "description": "Complete your first challenge step.",
+    "icon": "bug",
+    "xpBonus": 10,
+    "criteriaJson": "{\"type\":\"step_count\",\"stepType\":\"challenge\",\"count\":1}"
+  },
+  {
+    "id": "aha-moment",
+    "slug": "aha-moment",
+    "title": "Aha Moment",
+    "description": "Unlock your first theory reveal.",
+    "icon": "lightbulb",
+    "xpBonus": 10,
+    "criteriaJson": "{\"type\":\"step_count\",\"stepType\":\"reveal\",\"count\":1}"
+  },
+  {
+    "id": "speed-runner",
+    "slug": "speed-runner",
+    "title": "Speed Runner",
+    "description": "Complete a challenge on the first attempt.",
+    "icon": "zap",
+    "xpBonus": 25,
+    "criteriaJson": "{\"type\":\"first_attempt\",\"count\":1}"
+  },
+  {
+    "id": "perfect-path",
+    "slug": "perfect-path",
+    "title": "Perfect Path",
+    "description": "Complete an entire learning path without using any hints.",
+    "icon": "award",
+    "xpBonus": 50,
+    "criteriaJson": "{\"type\":\"path_no_hints\",\"count\":1}"
+  },
+  {
+    "id": "deep-diver",
+    "slug": "deep-diver",
+    "title": "Deep Diver",
+    "description": "Read all expandable theory sections in a path.",
+    "icon": "layers",
+    "xpBonus": 20,
+    "criteriaJson": "{\"type\":\"all_expandable_read\",\"count\":1}"
+  },
+  {
+    "id": "streak-3",
+    "slug": "streak-3",
+    "title": "Three in a Row",
+    "description": "Complete 3 steps in a single session.",
+    "icon": "flame",
+    "xpBonus": 15,
+    "criteriaJson": "{\"type\":\"session_streak\",\"count\":3}"
+  },
+  {
+    "id": "builder",
+    "slug": "builder",
+    "title": "Builder",
+    "description": "Complete your first learning path.",
+    "icon": "trophy",
+    "xpBonus": 50,
+    "criteriaJson": "{\"type\":\"path_complete\",\"count\":1}"
+  }
+]

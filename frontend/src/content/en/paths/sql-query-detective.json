@@ -1,0 +1,277 @@
+{
+  "id": "sql-query-detective",
+  "slug": "sql-query-detective",
+  "title": "SQL: The Query Detective",
+  "domain": "systems",
+  "mode": "fix-broken",
+  "difficulty": "intermediate",
+  "description": "Your database queries return wrong results, crash on edge cases, or run 100x slower than they should. Fix 7 broken queries — NULLs, JOINs, GROUP BY, window functions, indexes — and discover how SQL really thinks about your data.",
+  "xpReward": 320,
+  "estimatedMinutes": 45,
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "NULL Equals Nothing",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You need to find all users who have NOT set a phone number. This query returns zero rows, even though you know many users have NULL phones. Something is deeply wrong with how NULL comparison works.",
+        "code": "-- Table: users (id, name, email, phone)\n-- Task: Find users with no phone number\n\nSELECT name, email\nFROM users\nWHERE phone = NULL;\n\n-- Returns: 0 rows (wrong!)\n-- Expected: All users where phone is not set",
+        "language": "sql",
+        "hint": "NULL is not a value — it means 'unknown'. NULL = NULL evaluates to NULL (unknown), not TRUE. Use IS NULL instead of = NULL.",
+        "expectedConcepts": ["null-semantics", "three-valued-logic", "is-null"],
+        "validationRegex": "IS\\s+NULL",
+        "expectedFix": "WHERE phone IS NULL"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "Three-Valued Logic — NULL Is Not a Value",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## NULL in SQL\n\nNULL does not mean 'empty string', 'zero', or 'false'. It means **unknown** — the absence of a value. SQL uses **three-valued logic**: TRUE, FALSE, and UNKNOWN.\n\n### NULL Comparisons Always Return UNKNOWN\n\n```sql\nNULL = NULL    → UNKNOWN (not TRUE!)\nNULL != NULL   → UNKNOWN\nNULL > 5       → UNKNOWN\nNULL = 0       → UNKNOWN\nNULL = ''      → UNKNOWN\n```\n\nWHERE clauses only include rows where the condition is TRUE. UNKNOWN rows are excluded:\n\n```sql\n-- Returns rows where phone IS a known value equal to NULL?\n-- That's UNKNOWN — so zero rows.\nWHERE phone = NULL   -- Always returns 0 rows!\n\n-- Correct:\nWHERE phone IS NULL       -- Find NULLs\nWHERE phone IS NOT NULL   -- Exclude NULLs\n```\n\n### NULL Propagation\n\nNULL is 'contagious' — any operation involving NULL produces NULL:\n\n```sql\nSELECT 5 + NULL       → NULL\nSELECT 'hello' || NULL → NULL  (in standard SQL)\nSELECT NULL AND TRUE   → UNKNOWN\nSELECT NULL OR TRUE    → TRUE  (only exception!)\n```\n\n### Aggregate Functions and NULL\n\n```sql\n-- SUM, AVG, COUNT(column) ignore NULLs:\nSELECT AVG(salary) FROM employees;  -- Ignores NULL salaries\nSELECT COUNT(phone) FROM users;     -- Counts non-NULL phones only\nSELECT COUNT(*) FROM users;         -- Counts all rows (including NULLs)\n```\n\n### NULL-Safe Functions\n\n```sql\n-- COALESCE: return first non-NULL value\nSELECT COALESCE(phone, 'N/A') FROM users;\n\n-- NULLIF: return NULL if values are equal\nSELECT NULLIF(denominator, 0);  -- Prevents division by zero\n\n-- CASE WHEN: explicit NULL handling\nSELECT CASE WHEN phone IS NULL THEN 'No phone' ELSE phone END;\n```",
+        "keyInsight": "NULL means 'unknown', not 'empty'. NULL = NULL is UNKNOWN, not TRUE. Always use IS NULL / IS NOT NULL for NULL checks. NULLs propagate through expressions and are skipped by aggregates.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "NOT IN with NULLs — a famous trap",
+            "content": "```sql\n-- Find users NOT in the managers table\nSELECT * FROM users WHERE id NOT IN (SELECT manager_id FROM teams);\n```\n\nIf ANY manager_id is NULL, the subquery returns a set containing NULL. `NOT IN (1, 2, NULL)` evaluates to UNKNOWN for every value (even values clearly not 1 or 2). **Zero rows returned!**\n\n```sql\n-- Safe alternatives:\nSELECT * FROM users WHERE id NOT IN (\n    SELECT manager_id FROM teams WHERE manager_id IS NOT NULL\n);\n\n-- Or use NOT EXISTS (NULL-safe):\nSELECT * FROM users u\nWHERE NOT EXISTS (SELECT 1 FROM teams t WHERE t.manager_id = u.id);\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "The Missing Orders",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Your customer report is supposed to show ALL customers and their orders. But customers who haven't placed any orders are missing from the results. The SELECT looks right — why are some customers disappearing?",
+        "code": "-- Tables:\n-- customers (id, name, email, registered_at)\n-- orders (id, customer_id, total, created_at)\n\n-- Task: Show ALL customers with their order count\nSELECT \n    c.name,\n    c.email,\n    COUNT(o.id) AS order_count,\n    COALESCE(SUM(o.total), 0) AS total_spent\nFROM customers c\nJOIN orders o ON c.id = o.customer_id\nGROUP BY c.id, c.name, c.email\nORDER BY total_spent DESC;\n\n-- Problem: customers with 0 orders don't appear!",
+        "language": "sql",
+        "hint": "INNER JOIN only returns rows that match in BOTH tables. Customers with no orders have no matching row in orders. Use LEFT JOIN to keep all customers, even those with no orders.",
+        "expectedConcepts": ["join-types", "left-join", "inner-join"],
+        "validationRegex": "LEFT\\s+(OUTER\\s+)?JOIN",
+        "expectedFix": "LEFT JOIN orders o ON c.id = o.customer_id"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "title": "JOIN Types — How Tables Connect",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## SQL JOIN Types\n\nJOINs combine rows from two tables based on a related column.\n\n### The Four JOIN Types\n\n```\ncustomers:          orders:\n┌────┬───────┐      ┌────┬─────────────┬───────┐\n│ id │ name  │      │ id │ customer_id │ total │\n├────┼───────┤      ├────┼─────────────┼───────┤\n│  1 │ Alice │      │  1 │     1       │  50   │\n│  2 │ Bob   │      │  2 │     1       │  30   │\n│  3 │ Carol │      │  3 │     3       │  20   │\n└────┴───────┘      └────┴─────────────┴───────┘\n```\n\n**INNER JOIN** — only matching rows:\n```sql\nSELECT * FROM customers c\nINNER JOIN orders o ON c.id = o.customer_id;\n-- Alice-50, Alice-30, Carol-20  (Bob has no orders → excluded)\n```\n\n**LEFT JOIN** — all left rows + matching right rows:\n```sql\nSELECT * FROM customers c\nLEFT JOIN orders o ON c.id = o.customer_id;\n-- Alice-50, Alice-30, Bob-NULL, Carol-20  (Bob included with NULLs)\n```\n\n**RIGHT JOIN** — all right rows + matching left rows (rarely used).\n\n**FULL OUTER JOIN** — all rows from both sides.\n\n### When to Use Each\n\n| Query Goal | JOIN Type |\n|------------|----------|\n| Show only matching records | INNER JOIN |\n| Show ALL items from left table (even without matches) | LEFT JOIN |\n| Find unmatched records ('who has NO orders?') | LEFT JOIN + WHERE right.id IS NULL |\n| Combine two independent lists | FULL OUTER JOIN or CROSS JOIN |\n\n### Anti-Join Pattern: Finding Missing Records\n\n```sql\n-- Customers who have NEVER ordered:\nSELECT c.name, c.email\nFROM customers c\nLEFT JOIN orders o ON c.id = o.customer_id\nWHERE o.id IS NULL;\n```\n\nThis is called an **anti-join** — one of the most useful SQL patterns.",
+        "keyInsight": "INNER JOIN excludes unmatched rows. LEFT JOIN keeps all rows from the left table, filling NULLs where there's no match. Use LEFT JOIN + WHERE IS NULL to find records with no matches.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "JOIN performance and optimization",
+            "content": "JOINs can be expensive. The database uses these strategies:\n\n1. **Nested Loop Join**: For small tables or indexed joins. O(n×m) without index, O(n×log(m)) with index.\n2. **Hash Join**: For large unindexed tables. Builds hash table on smaller table, probes with larger.\n3. **Merge Join**: For pre-sorted data. Walks both sorted tables in parallel.\n\nKey optimizations:\n- Always index foreign key columns (`customer_id` in orders)\n- Put the smaller table first in the JOIN (optimizer usually handles this)\n- Filter with WHERE before joining when possible\n- Avoid JOINing on expressions (`ON LOWER(a.name) = LOWER(b.name)`) — can't use indexes"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-5",
+      "order": 5,
+      "title": "The Broken GROUP BY",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You want to find the most recent order for each customer. But the query returns a random order for each customer, not the most recent one. The MAX(created_at) is correct, but the order_id doesn't match it.",
+        "code": "-- Task: Find each customer's most recent order\nSELECT \n    c.name,\n    o.id AS latest_order_id,\n    o.total,\n    MAX(o.created_at) AS latest_order_date\nFROM customers c\nJOIN orders o ON c.id = o.customer_id\nGROUP BY c.id, c.name;\n\n-- Problem: o.id and o.total come from a RANDOM row\n-- in the group, not the row with MAX(created_at)!",
+        "language": "sql",
+        "hint": "Selecting non-aggregated columns (o.id, o.total) not in the GROUP BY is undefined behavior in SQL — the database picks an arbitrary row. Use a subquery or window function (ROW_NUMBER) to get the actual row with the max date.",
+        "expectedConcepts": ["group-by-semantics", "window-functions", "row-number"],
+        "validationRegex": "ROW_NUMBER|RANK|DENSE_RANK|ORDER BY.*DESC.*LIMIT|subquery|WHERE.*created_at\\s*=",
+        "expectedFix": "Use ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC) to identify the most recent order"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-6",
+      "order": 6,
+      "title": "GROUP BY Rules and Window Functions",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## The GROUP BY Rule\n\nEvery column in SELECT must either:\n1. Be in the GROUP BY clause, OR\n2. Be inside an aggregate function (COUNT, SUM, MAX, MIN, AVG)\n\n```sql\n-- WRONG: o.total is not in GROUP BY and not aggregated\nSELECT c.name, o.total, COUNT(*)\nFROM customers c JOIN orders o ON c.id = o.customer_id\nGROUP BY c.name;  -- Which o.total? There are many per group!\n\n-- CORRECT: aggregate o.total\nSELECT c.name, SUM(o.total), COUNT(*)\nFROM customers c JOIN orders o ON c.id = o.customer_id\nGROUP BY c.name;\n```\n\nMySQL (without ONLY_FULL_GROUP_BY) silently picks a random row. PostgreSQL and most databases reject the query.\n\n## Window Functions — Aggregation Without Grouping\n\nWindow functions compute values across rows related to the current row, **without collapsing rows**:\n\n```sql\nSELECT \n    name,\n    order_id,\n    total,\n    created_at,\n    ROW_NUMBER() OVER (\n        PARTITION BY customer_id \n        ORDER BY created_at DESC\n    ) AS rn\nFROM orders;\n```\n\nThis assigns `rn = 1` to each customer's most recent order.\n\n### Solving 'Most Recent Per Group'\n\n```sql\nWITH ranked AS (\n    SELECT \n        c.name,\n        o.id AS order_id,\n        o.total,\n        o.created_at,\n        ROW_NUMBER() OVER (\n            PARTITION BY c.id \n            ORDER BY o.created_at DESC\n        ) AS rn\n    FROM customers c\n    JOIN orders o ON c.id = o.customer_id\n)\nSELECT name, order_id, total, created_at\nFROM ranked\nWHERE rn = 1;\n```\n\n### Common Window Functions\n\n| Function | Purpose |\n|----------|--------|\n| `ROW_NUMBER()` | Unique sequential number per partition |\n| `RANK()` | Same number for ties, then skip |\n| `DENSE_RANK()` | Same number for ties, no skip |\n| `LAG(col, n)` | Value from n rows before |\n| `LEAD(col, n)` | Value from n rows after |\n| `SUM() OVER()` | Running total |\n| `AVG() OVER()` | Moving average |",
+        "keyInsight": "Every non-aggregated column must be in GROUP BY. Window functions (ROW_NUMBER, RANK, LAG, LEAD) let you compute per-group values without collapsing rows. CTEs (WITH) make complex queries readable.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "HAVING vs WHERE",
+            "content": "WHERE filters individual rows **before** grouping. HAVING filters groups **after** aggregation:\n\n```sql\n-- WHERE: filter rows before grouping\nSELECT department, AVG(salary)\nFROM employees\nWHERE hire_date > '2020-01-01'  -- Filter: only recent hires\nGROUP BY department;\n\n-- HAVING: filter groups after aggregation\nSELECT department, AVG(salary)\nFROM employees\nGROUP BY department\nHAVING AVG(salary) > 50000;  -- Filter: only high-paying departments\n```\n\nSQL execution order:\n1. FROM + JOIN\n2. WHERE\n3. GROUP BY\n4. HAVING\n5. SELECT\n6. ORDER BY\n7. LIMIT"
+          },
+          {
+            "title": "Window frames — ROWS vs RANGE",
+            "content": "Window functions operate over a 'frame' of rows:\n\n```sql\n-- Running total:\nSELECT \n    date, \n    revenue,\n    SUM(revenue) OVER (ORDER BY date\n        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n    ) AS running_total\nFROM daily_sales;\n\n-- 7-day moving average:\nSELECT \n    date,\n    revenue,\n    AVG(revenue) OVER (ORDER BY date\n        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n    ) AS avg_7day\nFROM daily_sales;\n```\n\nROWS counts physical rows. RANGE groups rows with equal ORDER BY values."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-7",
+      "order": 7,
+      "title": "The Query That Gets Slower Every Day",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "This query searches for orders in the last 30 days. It worked fine with 1,000 rows but now takes 8 seconds with 5 million rows. The database is doing a full table scan. Add the right index to make it fast.",
+        "code": "-- This query takes 8 seconds on 5M rows:\nSELECT \n    o.id,\n    c.name,\n    o.total,\n    o.created_at\nFROM orders o\nJOIN customers c ON c.id = o.customer_id\nWHERE o.status = 'completed'\n  AND o.created_at >= DATE('now', '-30 days')\nORDER BY o.created_at DESC\nLIMIT 50;\n\n-- EXPLAIN shows: SCAN TABLE orders (5,000,000 rows examined)\n-- How do you make this query use an index?",
+        "language": "sql",
+        "hint": "Create a composite index on the columns used in WHERE and ORDER BY. The order matters: put equality conditions first (status), then range conditions (created_at). CREATE INDEX idx_orders_status_date ON orders(status, created_at);",
+        "expectedConcepts": ["indexes", "query-optimization", "btree"],
+        "validationRegex": "CREATE\\s+INDEX|idx_",
+        "expectedFix": "CREATE INDEX idx_orders_status_date ON orders(status, created_at);"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-8",
+      "order": 8,
+      "title": "Indexes — How Databases Find Data Fast",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## How Indexes Work\n\nWithout an index, the database must scan every row (full table scan). With an index, it uses a **B-tree** (balanced tree) to jump to the right location — like a book's index vs reading every page.\n\n### B-Tree Performance\n\n| Operation | Without Index | With Index |\n|-----------|--------------|------------|\n| Find one row | O(n) = 5M rows scanned | O(log n) ≈ 23 lookups |\n| Range scan (30 days) | O(n) = 5M rows | O(log n + k) = 23 + matching rows |\n\n### Composite Indexes\n\nA composite index on `(status, created_at)` is like a phone book sorted by last name, then first name:\n\n```sql\nCREATE INDEX idx_orders_status_date ON orders(status, created_at);\n```\n\nThis index helps queries that filter by:\n- `status` alone ✓\n- `status` AND `created_at` ✓✓✓ (best case)\n- `created_at` alone ✗✗ (can't use — wrong order)\n\n### Index Column Ordering Rule\n\nPut columns in this order:\n1. **Equality** columns first (`status = 'completed'`)\n2. **Range** columns next (`created_at >= ...`)\n3. **ORDER BY** columns last (if they follow the range)\n\n```sql\n-- This index perfectly covers our query:\nCREATE INDEX idx_orders_status_date ON orders(status, created_at);\n\n-- The database can:\n-- 1. Jump to status = 'completed' (B-tree lookup)\n-- 2. Scan forward from the date threshold (already sorted)\n-- 3. Return rows in order (no separate sort needed)\n```\n\n### Covering Indexes\n\nIf the index contains all columns the query needs, the database never touches the table:\n\n```sql\n-- Include total in the index for a covering index:\nCREATE INDEX idx_covering ON orders(status, created_at, total);\n-- Now the entire query reads only the index — even faster\n```\n\n### When NOT to Index\n\n- Columns with very low cardinality (boolean with 50/50 split)\n- Tables with < 1000 rows (scan is fast enough)\n- Columns you never filter/sort on\n- Every index slows down INSERT/UPDATE/DELETE (must update the tree)",
+        "keyInsight": "Indexes turn O(n) scans into O(log n) lookups using B-trees. Composite indexes must have equality columns before range columns. Every index speeds reads but slows writes. Use EXPLAIN to verify the database uses your index.",
+        "formula": "$\\text{B-tree lookups} = \\lceil \\log_B(n) \\rceil$ where $B$ ≈ 100 (branching factor) and $n$ = row count",
+        "expandableSections": [
+          {
+            "title": "Using EXPLAIN to diagnose queries",
+            "content": "EXPLAIN shows the query execution plan:\n\n```sql\nEXPLAIN QUERY PLAN\nSELECT * FROM orders\nWHERE status = 'completed' AND created_at >= '2024-01-01';\n\n-- Without index:\n-- SCAN TABLE orders (~5M rows examined)\n\n-- With index:\n-- SEARCH TABLE orders USING INDEX idx_orders_status_date\n-- (status=? AND created_at>?)\n```\n\nKey things to look for:\n- **SCAN** = full table scan (slow) vs **SEARCH USING INDEX** (fast)\n- **rows examined** — fewer is better\n- **Using temporary** / **Using filesort** → consider adding index\n- **Covering index** → best case, no table access needed"
+          },
+          {
+            "title": "Index types beyond B-tree",
+            "content": "Most databases support specialized index types:\n\n| Type | Use Case |\n|------|----------|\n| **B-tree** (default) | General purpose: equality, range, sorting |\n| **Hash** | Exact equality only (faster than B-tree for =) |\n| **GIN** (PostgreSQL) | JSONB fields, arrays, full-text search |\n| **GiST** (PostgreSQL) | Geometric data, ranges |\n| **BRIN** (PostgreSQL) | Very large tables with naturally ordered data |\n\n```sql\n-- PostgreSQL: GIN index for JSONB queries\nCREATE INDEX idx_metadata ON events USING GIN (metadata);\nSELECT * FROM events WHERE metadata @> '{\"type\": \"click\"}';\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-9",
+      "order": 9,
+      "title": "The Deadly N+1 Query",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "This application code runs 1 query to fetch orders, then 1 query per order to fetch the customer name. With 1000 orders, that's 1001 queries. The page takes 12 seconds to load. Rewrite as a single efficient query.",
+        "code": "-- What the application does (pseudocode):\n-- orders = SELECT * FROM orders WHERE status = 'pending';\n-- for each order:\n--   customer = SELECT name FROM customers WHERE id = order.customer_id;\n--   display(order, customer.name)\n\n-- This runs 1001 queries for 1000 orders!\n-- Rewrite as ONE query that gets all the data:\n\n-- Your query here:\nSELECT *\nFROM orders\nWHERE status = 'pending';",
+        "language": "sql",
+        "hint": "Use a JOIN to fetch orders and customer names in a single query. SELECT o.*, c.name FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.status = 'pending';",
+        "expectedConcepts": ["n-plus-one", "join-optimization", "query-planning"],
+        "validationRegex": "JOIN\\s+customers",
+        "expectedFix": "SELECT o.id, o.total, o.created_at, c.name AS customer_name\nFROM orders o\nJOIN customers c ON c.id = o.customer_id\nWHERE o.status = 'pending';"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-10",
+      "order": 10,
+      "title": "Query Patterns — N+1, Batch, and JOIN",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## The N+1 Query Problem\n\nThe N+1 problem is the most common database performance anti-pattern:\n\n```\n1 query to fetch N items\n+ N queries to fetch related data for each item\n= N+1 total queries\n```\n\n### Why It's Devastating\n\n| Approach | Queries | Network Roundtrips | Time (1000 orders) |\n|----------|---------|-------------------|--------------------|\n| N+1 | 1001 | 1001 | ~5-12 seconds |\n| JOIN | 1 | 1 | ~10 ms |\n| Batch IN | 2 | 2 | ~15 ms |\n\nEach query has overhead: network roundtrip (~1-5ms), query parsing, plan generation. With 1001 queries, overhead alone is 1-5 seconds.\n\n### Three Solutions\n\n**1. JOIN (Best for related data)**\n```sql\nSELECT o.*, c.name\nFROM orders o\nJOIN customers c ON c.id = o.customer_id\nWHERE o.status = 'pending';\n```\n\n**2. Batch with IN (When JOIN is awkward)**\n```sql\n-- Query 1: Get orders\nSELECT * FROM orders WHERE status = 'pending';\n-- Collect customer_ids: [1, 2, 5, 7, ...]\n\n-- Query 2: Get all customers at once\nSELECT * FROM customers WHERE id IN (1, 2, 5, 7, ...);\n```\n\n**3. Subquery (When you need filtered aggregation)**\n```sql\nSELECT c.name,\n    (SELECT COUNT(*) FROM orders WHERE customer_id = c.id) AS order_count\nFROM customers c;\n-- Correlated subquery — runs once per customer\n-- Better as a JOIN with GROUP BY for large datasets\n```\n\n### ORMs and N+1\n\nEvery ORM (Django, SQLAlchemy, Prisma, TypeORM) can produce N+1 queries by default:\n```python\n# Django N+1:\nfor order in Order.objects.filter(status='pending'):\n    print(order.customer.name)  # Separate query per order!\n\n# Fix with select_related (JOIN):\nfor order in Order.objects.filter(status='pending').select_related('customer'):\n    print(order.customer.name)  # Single query with JOIN\n```",
+        "keyInsight": "The N+1 problem causes 1000 queries where 1 would suffice. Fix with JOINs, batch IN queries, or ORM eager loading (select_related, include, populate). A single JOIN is typically 100-1000x faster than N+1.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Detecting N+1 in production",
+            "content": "Symptoms:\n- Page loads proportional to data size (100 items = 1s, 1000 items = 10s)\n- Database shows many identical query patterns with different parameters\n- Connection pool exhaustion under load\n\nDetection tools:\n- **Django**: django-debug-toolbar shows query count per request\n- **SQLAlchemy**: set `echo=True` to log all queries\n- **PostgreSQL**: `pg_stat_statements` shows query frequency\n- **General**: Any request issuing >10 queries is suspicious"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-11",
+      "order": 11,
+      "title": "The Accidental Cross Join",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "This report should show each product with its category name. Instead, it returns 10,000 rows when there are only 100 products and 100 categories. Every product is paired with every category. Fix the Cartesian product.",
+        "code": "-- Tables:\n-- products (id, name, price, category_id) — 100 rows\n-- categories (id, name) — 100 rows\n\nSELECT \n    p.name AS product_name,\n    p.price,\n    c.name AS category_name\nFROM products p, categories c\nWHERE p.price > 50\nORDER BY p.price DESC;\n\n-- Returns: 10,000 rows (100 × 100) — every product paired with every category!",
+        "language": "sql",
+        "hint": "The old-style comma-separated FROM clause (FROM products, categories) without a join condition creates a CROSS JOIN — every row paired with every row. Add the join condition: WHERE p.category_id = c.id. Better yet, use explicit JOIN syntax.",
+        "expectedConcepts": ["cross-join", "cartesian-product", "join-conditions"],
+        "validationRegex": "JOIN\\s+categories|p\\.category_id\\s*=\\s*c\\.id",
+        "expectedFix": "FROM products p\nJOIN categories c ON p.category_id = c.id\nWHERE p.price > 50"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-12",
+      "order": 12,
+      "title": "Cartesian Products and Join Conditions",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## The Cartesian Product\n\nWhen you list tables in FROM without a join condition, SQL creates every possible combination of rows:\n\n```sql\nFROM products p, categories c  -- 100 × 100 = 10,000 rows\n```\n\nThis is a **CROSS JOIN** (or Cartesian product). With three tables:\n```sql\nFROM products p, categories c, suppliers s\n-- 100 × 100 × 50 = 500,000 rows!\n```\n\n### Old Style vs Explicit JOIN\n\n```sql\n-- Old style (implicit join): easy to accidentally forget conditions\nSELECT * \nFROM products p, categories c\nWHERE p.category_id = c.id AND p.price > 50;\n\n-- Modern (explicit JOIN): conditions separated, harder to get wrong\nSELECT *\nFROM products p\nJOIN categories c ON p.category_id = c.id\nWHERE p.price > 50;\n```\n\n### Why Explicit JOIN Is Better\n\n1. **Join conditions (ON)** and **filter conditions (WHERE)** are separated\n2. Impossible to forget a join condition by accident\n3. Supports LEFT/RIGHT/FULL syntax\n4. Self-documenting: the relationship is obvious\n\n### When CROSS JOIN Is Intentional\n\nRarely, you actually want every combination:\n\n```sql\n-- Generate a calendar: every date × every shift type\nSELECT d.date, s.shift_name\nFROM dates d\nCROSS JOIN shifts s\nWHERE d.date BETWEEN '2024-01-01' AND '2024-01-31';\n\n-- Generate a matrix: every product × every region\nSELECT p.name, r.name, 0 AS sales\nFROM products p\nCROSS JOIN regions r;\n```",
+        "keyInsight": "FROM with commas and no join condition creates a Cartesian product (every row × every row). Always use explicit JOIN syntax with ON conditions. CROSS JOIN should only be intentional.",
+        "formula": "$\\text{Cartesian product rows} = |A| \\times |B| \\times |C| \\times \\ldots$",
+        "expandableSections": [
+          {
+            "title": "Self-joins — joining a table to itself",
+            "content": "Sometimes you need to compare rows within the same table:\n\n```sql\n-- Find employees who earn more than their manager:\nSELECT \n    e.name AS employee,\n    e.salary AS employee_salary,\n    m.name AS manager,\n    m.salary AS manager_salary\nFROM employees e\nJOIN employees m ON e.manager_id = m.id\nWHERE e.salary > m.salary;\n\n-- Find pairs of products in the same category:\nSELECT a.name, b.name, a.category_id\nFROM products a\nJOIN products b ON a.category_id = b.category_id AND a.id < b.id;\n-- a.id < b.id prevents (A,B) and (B,A) duplicates\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-13",
+      "order": 13,
+      "title": "The Transaction Gone Wrong",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "This bank transfer deducts from one account and credits another. But if the second UPDATE fails (insufficient funds check, network error), the money vanishes — debited but never credited. Wrap in a transaction to make it atomic.",
+        "code": "-- Transfer $500 from account 1 to account 2\n\nUPDATE accounts SET balance = balance - 500 WHERE id = 1;\n-- What if the server crashes RIGHT HERE?\nUPDATE accounts SET balance = balance + 500 WHERE id = 2;\n\n-- If the second statement fails:\n-- Account 1: -$500 (debited) ✓\n-- Account 2:  $0   (never credited) ✗\n-- $500 has vanished!",
+        "language": "sql",
+        "hint": "Wrap both statements in BEGIN TRANSACTION ... COMMIT. If anything fails between BEGIN and COMMIT, call ROLLBACK — all changes are undone atomically. The money either moves completely or not at all.",
+        "expectedConcepts": ["transactions", "atomicity", "acid"],
+        "validationRegex": "BEGIN|TRANSACTION|COMMIT|ROLLBACK",
+        "expectedFix": "BEGIN TRANSACTION;\nUPDATE accounts SET balance = balance - 500 WHERE id = 1;\nUPDATE accounts SET balance = balance + 500 WHERE id = 2;\nCOMMIT;"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-14",
+      "order": 14,
+      "title": "Transactions and ACID — Making Databases Reliable",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## ACID Properties\n\nEvery database transaction guarantees four properties:\n\n### Atomicity — All or Nothing\n\n```sql\nBEGIN TRANSACTION;\n  UPDATE accounts SET balance = balance - 500 WHERE id = 1;\n  UPDATE accounts SET balance = balance + 500 WHERE id = 2;\nCOMMIT;\n-- If ANYTHING fails: both changes are rolled back\n-- Money never vanishes or duplicates\n```\n\nThe database writes changes to a **write-ahead log (WAL)** first. On crash recovery, it replays committed transactions and rolls back uncommitted ones.\n\n### Consistency — Rules Are Never Broken\n\n```sql\n-- Constraint: balance must never go negative\nALTER TABLE accounts ADD CHECK (balance >= 0);\n\nBEGIN;\n  UPDATE accounts SET balance = balance - 500 WHERE id = 1;\n  -- If this would make balance negative: constraint violation → auto-rollback\nCOMMIT;\n```\n\n### Isolation — Concurrent Transactions Don't Interfere\n\n| Level | Dirty Reads | Non-Repeatable Reads | Phantom Rows |\n|-------|------------|---------------------|-------------|\n| READ UNCOMMITTED | Yes | Yes | Yes |\n| READ COMMITTED | No | Yes | Yes |\n| REPEATABLE READ | No | No | Yes |\n| SERIALIZABLE | No | No | No |\n\nMost databases default to **READ COMMITTED** — you see only committed data from other transactions.\n\n### Durability — Committed Data Survives Crashes\n\nOnce COMMIT returns success, the data is on disk. Even if the server loses power 1ms later, the transaction is preserved.\n\n## Practical Transaction Patterns\n\n```sql\n-- Pattern 1: Try/catch with rollback\nBEGIN;\n  -- Multiple operations...\n  INSERT INTO audit_log (action, user_id) VALUES ('transfer', 1);\n  UPDATE accounts SET balance = balance - 500 WHERE id = 1;\n  UPDATE accounts SET balance = balance + 500 WHERE id = 2;\nCOMMIT;\n-- On any error: ROLLBACK;\n\n-- Pattern 2: Optimistic locking\nSELECT balance, version FROM accounts WHERE id = 1;\n-- Application processes...\nUPDATE accounts \n  SET balance = new_balance, version = version + 1\n  WHERE id = 1 AND version = old_version;\n-- If 0 rows updated: someone else changed it → retry\n```",
+        "keyInsight": "Transactions make multiple operations atomic — all succeed or all fail. ACID (Atomicity, Consistency, Isolation, Durability) are the four guarantees every reliable database provides. Always use transactions for multi-step data modifications.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Deadlocks and lock ordering",
+            "content": "Two transactions can deadlock — each waiting for a lock the other holds:\n\n```\nTransaction A:               Transaction B:\nLOCK account 1 ✓            LOCK account 2 ✓\nLOCK account 2 ⏳ (waiting)  LOCK account 1 ⏳ (waiting)\n  → DEADLOCK!\n```\n\nThe database detects this and kills one transaction (rolls it back).\n\nPrevention: always lock resources in the same order:\n```sql\n-- Always lock the lower ID first:\nBEGIN;\n  SELECT * FROM accounts WHERE id = 1 FOR UPDATE;  -- Lock 1 first\n  SELECT * FROM accounts WHERE id = 2 FOR UPDATE;  -- Then lock 2\n  -- Now do the transfer\nCOMMIT;\n```"
+          },
+          {
+            "title": "When to use SERIALIZABLE",
+            "content": "SERIALIZABLE is the strictest isolation level — transactions behave as if they ran one at a time. It prevents all anomalies but reduces concurrency.\n\nUse it for:\n- Financial calculations (account balances must be exact)\n- Inventory management (can't oversell)\n- Booking systems (can't double-book)\n\n```sql\nSET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nBEGIN;\n  SELECT available_seats FROM flights WHERE id = 42;\n  -- If >= 1:\n  UPDATE flights SET available_seats = available_seats - 1 WHERE id = 42;\n  INSERT INTO bookings (flight_id, passenger_id) VALUES (42, 100);\nCOMMIT;\n```\n\nWith two concurrent bookings for the last seat, SERIALIZABLE ensures only one succeeds."
+          }
+        ]
+      },
+      "xpReward": 5
+    }
+  ]
+}

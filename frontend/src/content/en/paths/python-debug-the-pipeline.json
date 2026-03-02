@@ -1,0 +1,265 @@
+{
+  "id": "python-debug-the-pipeline",
+  "slug": "python-debug-the-pipeline",
+  "title": "Python: Debug the Data Pipeline",
+  "domain": "programming",
+  "mode": "fix-broken",
+  "difficulty": "intermediate",
+  "description": "Python is easy to learn, hard to master. Debug 7 broken data-processing scripts — each hides a subtle Python gotcha: mutable defaults, shallow copies, scoping traps, generator exhaustion, floating-point lies, and more. Every fix reveals a concept most Python devs learn the hard way.",
+  "xpReward": 340,
+  "estimatedMinutes": 50,
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "The Haunted Default Argument",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "This function appends a user to a group list. But calling it multiple times without passing a group produces bizarre results — users from previous calls appear. The list is haunted. Find and fix the bug.",
+        "code": "def add_user_to_group(user: str, group: list = []) -> list:\n    group.append(user)\n    return group\n\n# Expected: each call with no group should start fresh\nresult_a = add_user_to_group(\"Alice\")\nprint(result_a)   # ['Alice']  ✓\n\nresult_b = add_user_to_group(\"Bob\")\nprint(result_b)   # ['Alice', 'Bob']  ← BUG! Expected ['Bob']\n\nresult_c = add_user_to_group(\"Charlie\")\nprint(result_c)   # ['Alice', 'Bob', 'Charlie']  ← BUG!",
+        "language": "python",
+        "hint": "Default arguments are evaluated ONCE — when the function is defined, not each time it's called. The same list object is reused. Use None as default and create a new list inside the function.",
+        "expectedConcepts": ["mutable-defaults", "object-identity", "function-definition"],
+        "validationRegex": "=\\s*None|if.*is None|if not group",
+        "expectedFix": "def add_user_to_group(user: str, group: list = None) -> list:\n    if group is None:\n        group = []\n    group.append(user)\n    return group"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "Mutable Defaults — Python's Most Famous Gotcha",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## The Mutable Default Argument Trap\n\nThis is Python's #1 most common gotcha, even for experienced developers.\n\n### What Happens\n\nPython evaluates default arguments **once**, when the function is defined (at import time), not each time the function is called:\n\n```python\ndef f(items=[]):  # This [] is created ONCE\n    items.append(1)\n    return items\n\n# The same list object is reused every call:\nf()  # [1]\nf()  # [1, 1]\nf()  # [1, 1, 1]\n```\n\nYou can even see the default object:\n```python\nprint(f.__defaults__)  # ([1, 1, 1],) — it's the same mutated list\n```\n\n### The Fix — The None Pattern\n\n```python\ndef f(items=None):\n    if items is None:\n        items = []\n    items.append(1)\n    return items\n```\n\nNow each call gets a fresh list. This pattern is so standard that linters (pylint, ruff) flag mutable default arguments.\n\n### Why Does Python Do This?\n\nPerformance and consistency. Function definitions are executable statements in Python. Default values are part of the function object. Evaluating them once is simpler and faster. The alternative (evaluating each call) would make function calls slower and default expressions harder to reason about.\n\n### All Mutable Defaults Are Traps\n\nThe same bug affects: `dict`, `set`, `list`, any class instance:\n\n```python\n# All dangerous:\ndef bad(d={}): ...\ndef bad(s=set()): ...\ndef bad(config=Config()): ...\n\n# All safe:\ndef good(d=None): d = d or {}\ndef good(s=None): s = s if s is not None else set()\n```",
+        "keyInsight": "Default arguments are evaluated once at function definition, not per call. Mutable defaults (list, dict, set) are shared across all calls. Always use None as the default and create fresh objects inside the function.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "When mutable defaults are intentional",
+            "content": "Rarely, the shared-state behavior is used deliberately — as a poor man's cache:\n\n```python\ndef fibonacci(n, cache={0: 0, 1: 1}):\n    if n not in cache:\n        cache[n] = fibonacci(n-1) + fibonacci(n-2)\n    return cache[n]\n```\n\nThis works but is brittle and obscure. Use `@functools.lru_cache` instead:\n\n```python\nfrom functools import lru_cache\n\n@lru_cache(maxsize=None)\ndef fibonacci(n):\n    if n < 2: return n\n    return fibonacci(n-1) + fibonacci(n-2)\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "The Shallow Copy Surprise",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You copy a user's settings to create a new user's defaults. But modifying the new user's notification preferences also changes the original user's. The copy isn't doing what you think.",
+        "code": "import copy\n\ndefault_settings = {\n    \"theme\": \"dark\",\n    \"language\": \"en\",\n    \"notifications\": {\n        \"email\": True,\n        \"push\": True,\n        \"sms\": False\n    }\n}\n\n# Create new user's settings from defaults\nnew_user_settings = default_settings.copy()\nnew_user_settings[\"theme\"] = \"light\"  # Fine — creates new string ref\nnew_user_settings[\"notifications\"][\"sms\"] = True  # Modifies BOTH!\n\nprint(default_settings[\"notifications\"][\"sms\"])  # True ← BUG! Should be False\nprint(new_user_settings[\"notifications\"][\"sms\"])  # True",
+        "language": "python",
+        "hint": ".copy() is a shallow copy — nested objects are shared, not duplicated. Use copy.deepcopy() to recursively copy all nested objects.",
+        "expectedConcepts": ["shallow-copy", "deep-copy", "reference-semantics"],
+        "validationRegex": "deepcopy|copy\\.deepcopy",
+        "expectedFix": "new_user_settings = copy.deepcopy(default_settings)"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "title": "Copy Semantics — Shallow, Deep, and References",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Python's Reference Model\n\nEvery variable in Python is a **reference** (pointer) to an object. Assignment copies the reference, not the object:\n\n```python\na = [1, 2, 3]\nb = a        # b points to THE SAME list\nb.append(4)\nprint(a)     # [1, 2, 3, 4] — it's the same object!\nprint(a is b)  # True — same identity\n```\n\n### Three Levels of Copying\n\n```python\nimport copy\n\noriginal = {\"users\": [\"Alice\", \"Bob\"], \"count\": 2}\n\n# 1. Assignment — no copy at all (same object)\nref = original  # ref IS original\n\n# 2. Shallow copy — new outer object, shared inner objects\nshallow = original.copy()  # or dict(original), or {**original}\n# shallow[\"users\"] IS original[\"users\"] — same list!\n\n# 3. Deep copy — recursive copy of everything\ndeep = copy.deepcopy(original)\n# deep[\"users\"] is NOT original[\"users\"] — independent list\n```\n\n### Visualization\n\n```\noriginal ──► { \"users\": ─► [\"Alice\", \"Bob\"]  ← shared!\n               \"count\": 2 }\n                              ▲\nshallow  ──► { \"users\": ──────┘\n               \"count\": 2 }\n\ndeep     ──► { \"users\": ─► [\"Alice\", \"Bob\"]  ← independent copy\n               \"count\": 2 }\n```\n\n### When to Use Each\n\n| Operation | Use When |\n|-----------|----------|\n| `=` | You want both names to refer to the exact same object |\n| `.copy()` / `[:]` | Flat structure with only immutable values (strings, numbers) |\n| `copy.deepcopy()` | Nested structures that will be modified independently |\n\n### Performance Note\n\n`deepcopy()` is slow for large structures. For JSON-serializable data, `json.loads(json.dumps(obj))` is sometimes faster but loses non-JSON types.",
+        "keyInsight": "Variables are references in Python. Shallow copy duplicates the container but shares nested objects. Deep copy recursively duplicates everything. Know which level of copying you need.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "The list slice copy trick",
+            "content": "For lists, `[:]` is a common shallow copy idiom:\n\n```python\noriginal = [1, 2, [3, 4]]\nshallow = original[:]  # new list, same elements\n\nshallow[0] = 99       # doesn't affect original\nshallow[2].append(5)  # DOES affect original! [3, 4, 5]\n```\n\nOther shallow copy methods:\n```python\nlist(original)      # list constructor\n[*original]         # unpacking\noriginal.copy()     # explicit method\n```\n\nAll have the same shallow behavior."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-5",
+      "order": 5,
+      "title": "The Disappearing Loop Variable",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You create a list of functions that should each print their index number. But they ALL print the same number — the last one. A classic closure trap.",
+        "code": "def create_handlers():\n    handlers = []\n    for i in range(5):\n        handlers.append(lambda: print(f\"Handler {i}\"))\n    return handlers\n\nfor handler in create_handlers():\n    handler()\n\n# Output:\n# Handler 4  ← all print 4!\n# Handler 4\n# Handler 4\n# Handler 4\n# Handler 4",
+        "language": "python",
+        "hint": "The lambda captures the variable 'i' by reference, not by value. By the time the lambdas execute, the loop has finished and i is 4. Fix by capturing i's current value as a default argument: lambda i=i: ...",
+        "expectedConcepts": ["closures", "late-binding", "loop-variables"],
+        "validationRegex": "lambda\\s+i\\s*=\\s*i|lambda\\s+x\\s*=\\s*i|functools\\.partial",
+        "expectedFix": "handlers.append(lambda i=i: print(f\"Handler {i}\"))"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-6",
+      "order": 6,
+      "title": "Closures and Variable Scoping (LEGB)",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Late Binding Closures\n\nPython closures capture variables **by reference**, not by value. They look up the variable when called, not when defined:\n\n```python\nx = 10\nf = lambda: x  # captures the NAME 'x'\nx = 20\nf()  # Returns 20, not 10!\n```\n\nIn the loop bug:\n```python\nfor i in range(5):\n    handlers.append(lambda: print(i))\n# All lambdas share the same 'i'. When called, i is 4.\n```\n\n### The Fix: Default Argument Capture\n\n```python\nfor i in range(5):\n    handlers.append(lambda i=i: print(i))\n# Default args are evaluated at definition time (like constants)\n```\n\nAlternatively, use `functools.partial`:\n```python\nfrom functools import partial\nfor i in range(5):\n    handlers.append(partial(print, f\"Handler {i}\"))\n```\n\n## The LEGB Rule\n\nPython resolves names in this order:\n\n1. **L**ocal — inside the current function\n2. **E**nclosing — in any enclosing function (closure)\n3. **G**lobal — at the module level\n4. **B**uilt-in — Python's built-in names\n\n```python\nname = \"global\"              # G\n\ndef outer():\n    name = \"enclosing\"       # E\n    \n    def inner():\n        name = \"local\"       # L\n        print(name)           # → \"local\"\n    \n    inner()\n\nouter()\n```\n\n### The `nonlocal` and `global` Keywords\n\n```python\ndef counter():\n    count = 0\n    def increment():\n        nonlocal count  # Look up to enclosing scope\n        count += 1\n        return count\n    return increment\n\nc = counter()\nc()  # 1\nc()  # 2\n```\n\nWithout `nonlocal`, `count += 1` would create a new local variable and throw `UnboundLocalError`.",
+        "keyInsight": "Python closures capture variables by reference (late binding), not by value. Loop variables in closures all share the same reference. Fix with default argument capture (i=i) or functools.partial. LEGB determines name resolution order.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "The UnboundLocalError trap",
+            "content": "If you assign to a variable anywhere in a function, Python treats it as local everywhere in that function:\n\n```python\ncount = 10\n\ndef increment():\n    print(count)   # UnboundLocalError: referenced before assignment\n    count += 1     # This line makes 'count' local to the function\n\nincrement()\n```\n\nPython decides at compile time: 'count is assigned in this function → it's local'. The print() then fails because the local count doesn't exist yet.\n\nFix: `global count` or restructure to avoid mutation."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-7",
+      "order": 7,
+      "title": "The Exhausted Generator",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You read sensor data from a generator and try to use it twice — once to find the max value, once to compute the average. The second operation returns 0. The generator is mysteriously empty the second time.",
+        "code": "def read_sensor_data():\n    \"\"\"Simulates reading temperature data from a sensor.\"\"\"\n    import random\n    random.seed(42)\n    for _ in range(100):\n        yield round(random.uniform(18.0, 32.0), 1)\n\nreadings = read_sensor_data()\n\n# Find the maximum temperature\nmax_temp = max(readings)\nprint(f\"Max temperature: {max_temp}°C\")  # Works fine\n\n# Compute the average — BUG: generator is exhausted!\nall_readings = list(readings)  # Empty list!\navg_temp = sum(all_readings) / len(all_readings) if all_readings else 0\nprint(f\"Average: {avg_temp}°C\")  # 0°C ← wrong!",
+        "language": "python",
+        "hint": "Generators can only be iterated once. After max() consumes all values, the generator is exhausted. Convert to a list first (list(read_sensor_data())), then use the list for both operations.",
+        "expectedConcepts": ["generators", "iterators", "single-pass-iteration"],
+        "validationRegex": "list\\(read_sensor_data\\(\\)\\)|readings\\s*=\\s*list\\(",
+        "expectedFix": "readings = list(read_sensor_data())"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-8",
+      "order": 8,
+      "title": "Generators, Iterators, and Lazy Evaluation",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Generators: Single-Pass Iterators\n\nA generator function uses `yield` instead of `return`. It produces values **lazily** — one at a time, on demand:\n\n```python\ndef count_up_to(n):\n    i = 0\n    while i < n:\n        yield i   # Pauses here, returns value\n        i += 1    # Resumes here on next iteration\n```\n\n### Key Property: Single-Pass\n\nGenerators can only be iterated **once**. After exhaustion, they're empty forever:\n\n```python\ngen = count_up_to(3)\nlist(gen)  # [0, 1, 2]\nlist(gen)  # [] — exhausted!\n```\n\nThis is different from a list, which can be iterated any number of times.\n\n### Why Use Generators?\n\n**Memory efficiency**. A generator that produces 10 million numbers uses constant memory — it only holds the current value:\n\n```python\n# This uses ~80 MB of memory:\nbig_list = [x ** 2 for x in range(10_000_000)]\n\n# This uses ~100 bytes:\nbig_gen = (x ** 2 for x in range(10_000_000))\n```\n\n### Iterator Protocol\n\nGenerators implement Python's iterator protocol:\n- `__iter__()` → returns self\n- `__next__()` → returns next value, raises StopIteration when done\n\n```python\ngen = count_up_to(2)\nnext(gen)  # 0\nnext(gen)  # 1\nnext(gen)  # StopIteration exception\n```\n\n### When to Materialize\n\nConvert to a list when you need:\n- Multiple passes over the data\n- Random access (indexing)\n- Length checking\n- Slicing\n\nKeep as generator when:\n- Data is too large for memory\n- You only need one pass\n- You're chaining transformations (pipeline pattern)",
+        "keyInsight": "Generators produce values lazily (one at a time) and can only be iterated once. They trade reusability for memory efficiency. If you need multiple passes, materialize to a list first.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Generator pipelines — Unix-style data processing",
+            "content": "Generators compose beautifully for data processing pipelines:\n\n```python\ndef read_logs(path):\n    with open(path) as f:\n        yield from f  # yields each line\n\ndef parse_json(lines):\n    import json\n    for line in lines:\n        yield json.loads(line)\n\ndef filter_errors(records):\n    for r in records:\n        if r.get('level') == 'ERROR':\n            yield r\n\n# Memory-efficient pipeline:\npipeline = filter_errors(parse_json(read_logs('app.log')))\nfor error in pipeline:  # Processes one line at a time\n    handle_error(error)\n```\n\nThis processes a 10 GB log file using only bytes of memory."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-9",
+      "order": 9,
+      "title": "Class vs Instance Variables",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Every Student instance should have its own list of grades. But when you add a grade to one student, it appears on ALL students. The class is broken.",
+        "code": "class Student:\n    name = \"\"\n    grades = []\n    \n    def __init__(self, name):\n        self.name = name\n    \n    def add_grade(self, grade):\n        self.grades.append(grade)\n    \n    def average(self):\n        return sum(self.grades) / len(self.grades) if self.grades else 0\n\nalice = Student(\"Alice\")\nbob = Student(\"Bob\")\n\nalice.add_grade(95)\nbob.add_grade(72)\n\nprint(f\"Alice: {alice.grades}\")  # [95, 72] ← BUG! Should be [95]\nprint(f\"Bob: {bob.grades}\")      # [95, 72] ← BUG! Should be [72]\nprint(alice.grades is bob.grades) # True — same object!",
+        "language": "python",
+        "hint": "grades = [] defined at class level is a CLASS variable — shared by all instances. Move it into __init__ as self.grades = [] to make it an INSTANCE variable — each object gets its own list.",
+        "expectedConcepts": ["class-variables", "instance-variables", "object-model"],
+        "validationRegex": "self\\.grades\\s*=\\s*\\[\\]",
+        "expectedFix": "def __init__(self, name):\n        self.name = name\n        self.grades = []"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-10",
+      "order": 10,
+      "title": "Python's Object Model — Classes and Instances",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Class Variables vs Instance Variables\n\nPython has two kinds of attributes:\n\n```python\nclass Dog:\n    species = \"Canis familiaris\"  # CLASS variable (shared)\n    \n    def __init__(self, name):\n        self.name = name            # INSTANCE variable (per-object)\n```\n\n### The Lookup Chain\n\nWhen you access `obj.attr`, Python looks:\n1. `obj.__dict__` (instance attributes)\n2. `type(obj).__dict__` (class attributes)\n3. Parent classes (MRO)\n\n```python\nfido = Dog(\"Fido\")\nfido.name       # Found in instance __dict__\nfido.species    # Not in instance → found in class __dict__\n```\n\n### The Trap: Mutable Class Variables\n\nImmutable class variables (strings, numbers) are safe because assignment creates a new instance variable:\n\n```python\nclass Counter:\n    count = 0  # class variable\n\na = Counter()\na.count += 1   # Creates instance variable a.count = 1\nCounter.count   # Still 0 — class variable unchanged\n```\n\nBut mutable class variables (lists, dicts) are shared:\n\n```python\nclass Broken:\n    items = []  # class variable — ONE list for ALL instances\n\na = Broken()\nb = Broken()\na.items.append(1)  # Mutates the shared class list\nb.items  # [1] — both see the same list!\n```\n\n### The Rule\n\n**Initialize all mutable attributes in `__init__`:**\n\n```python\nclass Correct:\n    def __init__(self):\n        self.items = []  # Each instance gets its own list\n```\n\nClass variables are appropriate for:\n- Constants (`MAX_SIZE = 100`)\n- Immutable defaults (`default_color = \"blue\"`)\n- Shared counters (with care)\n\nNever put mutable types (list, dict, set) as class variables unless you explicitly want sharing.",
+        "keyInsight": "Class-level attributes are shared by all instances. Instance-level attributes (self.x in __init__) are per-object. Never use mutable class variables (lists, dicts) unless you intend sharing.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "__slots__ — restricting instance attributes",
+            "content": "For classes with many instances, `__slots__` saves memory and catches typos:\n\n```python\nclass Point:\n    __slots__ = ('x', 'y')  # Only these attributes allowed\n    \n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n\np = Point(1, 2)\np.z = 3  # AttributeError: 'Point' has no attribute 'z'\n```\n\nBenefits:\n- ~30% less memory per instance (no `__dict__`)\n- Slightly faster attribute access\n- Catches typos (assigning to wrong attribute name)"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-11",
+      "order": 11,
+      "title": "Floating Point Equals Nothing",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Your financial calculation computes the total of three line items. The total should be 0.3, and the assertion passes in every other language you've tried. In Python, it fails.",
+        "code": "# Financial calculation — sum three line items\nitem_a = 0.1\nitem_b = 0.1\nitem_c = 0.1\n\ntotal = item_a + item_b + item_c\nexpected = 0.3\n\nif total == expected:\n    print(\"Transaction balanced ✓\")\nelse:\n    print(f\"DISCREPANCY: {total} != {expected}\")\n    print(f\"Difference: {total - expected}\")\n    # Output: DISCREPANCY: 0.30000000000000004 != 0.3",
+        "language": "python",
+        "hint": "Floating point numbers cannot represent 0.1 exactly in binary (like 1/3 can't be exact in decimal). Use math.isclose() for comparisons, or use the decimal module for exact decimal arithmetic in financial calculations.",
+        "expectedConcepts": ["floating-point", "ieee-754", "decimal-arithmetic"],
+        "validationRegex": "math\\.isclose|Decimal|abs\\(.*\\)\\s*<|round\\(",
+        "expectedFix": "import math\nif math.isclose(total, expected):"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-12",
+      "order": 12,
+      "title": "IEEE 754 and Floating-Point Arithmetic",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Why 0.1 + 0.1 + 0.1 ≠ 0.3\n\nComputers store numbers in binary. Just as $\\frac{1}{3}$ = 0.333... never terminates in decimal, $\\frac{1}{10}$ = 0.00011001100... never terminates in binary.\n\nIEEE 754 stores `0.1` as the nearest representable 64-bit float:\n```\n0.1000000000000000055511151231257827021181583404541015625\n```\n\nThree of these:\n```python\n0.1 + 0.1 + 0.1 = 0.30000000000000004  # Not exactly 0.3\n```\n\n### Safe Comparison\n\n```python\nimport math\n\n# Relative tolerance (good for most cases):\nmath.isclose(0.1 + 0.1 + 0.1, 0.3)  # True (default rel_tol=1e-9)\n\n# Absolute tolerance (for values near zero):\nmath.isclose(result, 0.0, abs_tol=1e-9)\n```\n\n### For Financial Calculations: Use Decimal\n\n```python\nfrom decimal import Decimal\n\n# WRONG: passing float preserves the error\nDecimal(0.1)  # Decimal('0.100000000000000005551...')\n\n# CORRECT: pass string for exact representation\na = Decimal('0.1')\nb = Decimal('0.1')\nc = Decimal('0.1')\nprint(a + b + c == Decimal('0.3'))  # True — exact!\n```\n\n### Quick Reference\n\n| Use Case | Solution |\n|----------|----------|\n| Scientific computing | `math.isclose()` with appropriate tolerance |\n| Financial/currency | `decimal.Decimal` with string inputs |\n| Counting money | Integer cents (store as `int`, divide by 100 for display) |\n| Testing | `pytest.approx(expected, rel=1e-6)` |",
+        "keyInsight": "Floating-point numbers (IEEE 754) cannot represent most decimal fractions exactly. Never use == for float comparison. Use math.isclose() for general use, decimal.Decimal for financial calculations.",
+        "formula": "$0.1_{10} = 0.0\\overline{0011}_{2}$ (repeating binary — cannot be stored exactly in finite bits)",
+        "expandableSections": [
+          {
+            "title": "IEEE 754 format — what's in a float?",
+            "content": "A 64-bit float (Python's `float`) has:\n- 1 sign bit\n- 11 exponent bits (range ~10⁻³⁰⁸ to ~10³⁰⁸)\n- 52 mantissa bits (~15-17 significant decimal digits)\n\n```python\nimport struct\nbytes = struct.pack('d', 0.1)\nprint(' '.join(f'{b:08b}' for b in bytes))\n```\n\nPractical limits:\n```python\n# Representable:\n1.0 + 1e-15   # 1.000000000000001 (distinguishable)\n1.0 + 1e-16   # 1.0 (rounded — epsilon exceeded)\n\nimport sys\nsys.float_info.epsilon  # 2.22e-16 (smallest distinguishable difference near 1.0)\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-13",
+      "order": 13,
+      "title": "Exception Handling Gone Wrong",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "This data processing function uses a broad try/except to 'handle errors gracefully'. But it silently swallows real bugs — a typo in a variable name (NameError) is caught and ignored. Debug why the output is all zeros and fix the error handling.",
+        "code": "def process_records(records):\n    results = []\n    for record in records:\n        try:\n            # Bug: 'recrod' is a typo for 'record'\n            value = recrod[\"amount\"] * 1.1  # NameError!\n            results.append(round(value, 2))\n        except:\n            # \"Graceful error handling\" — catches EVERYTHING\n            results.append(0)\n    return results\n\ndata = [{\"amount\": 100}, {\"amount\": 200}, {\"amount\": 50}]\nprint(process_records(data))  # [0, 0, 0] ← all zeros, no error shown!",
+        "language": "python",
+        "hint": "Bare 'except:' catches ALL exceptions including NameError, KeyboardInterrupt, and SystemExit. Always catch specific exceptions: except (KeyError, TypeError) as e: — this lets real bugs propagate.",
+        "expectedConcepts": ["exception-handling", "bare-except", "error-specificity"],
+        "validationRegex": "except\\s+(KeyError|ValueError|TypeError|Exception)\\b",
+        "expectedFix": "except (KeyError, TypeError) as e:"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-14",
+      "order": 14,
+      "title": "Exception Handling Done Right",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## The Exception Anti-Pattern\n\nBare `except:` and `except Exception:` are among the most dangerous patterns in Python. They hide bugs:\n\n```python\n# TERRIBLE — catches NameError, TypeError, KeyboardInterrupt, everything:\ntry:\n    process(data)\nexcept:\n    pass  # Silent failure — bugs are invisible\n\n# BAD — still too broad:\ntry:\n    process(data)\nexcept Exception:\n    pass  # Hides NameError, AttributeError, TypeError...\n```\n\n### What Bare Except Catches\n\n```\nBaseException\n├── SystemExit         ← sys.exit()\n├── KeyboardInterrupt  ← Ctrl+C\n├── GeneratorExit      ← generator cleanup\n└── Exception\n    ├── NameError      ← typos in variable names\n    ├── TypeError      ← wrong argument types\n    ├── AttributeError ← wrong method/property names\n    ├── ValueError     ← invalid values\n    ├── KeyError       ← missing dict keys\n    ├── IOError        ← file/network issues\n    └── ...hundreds more\n```\n\n### The Right Way\n\n1. **Catch specific exceptions:**\n```python\ntry:\n    value = config[\"port\"]\n    port = int(value)\nexcept KeyError:\n    port = 8080  # Missing key → use default\nexcept ValueError:\n    raise ConfigError(f\"Invalid port: {value}\")\n```\n\n2. **Log unexpected errors:**\n```python\ntry:\n    process(record)\nexcept (ValueError, KeyError) as e:\n    logger.warning(f\"Skipping record: {e}\")\n    results.append(None)\n```\n\n3. **Let real bugs crash:**\nNameError, TypeError, AttributeError — these are programming errors. They should crash loudly so you fix them.\n\n### The Finally and Else Clauses\n\n```python\ntry:\n    f = open('data.txt')\n    data = f.read()\nexcept FileNotFoundError:\n    data = default_data\nelse:\n    # Runs ONLY if no exception was raised\n    process(data)\nfinally:\n    # ALWAYS runs — even if exception or return\n    f.close()\n```",
+        "keyInsight": "Never use bare except: or except Exception:. Catch only specific exceptions you can actually handle. Let programming errors (NameError, TypeError) crash loudly. Silence is not error handling — it's bug hiding.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "EAFP vs LBYL — Python's philosophy",
+            "content": "Python prefers 'Easier to Ask Forgiveness than Permission' (EAFP) over 'Look Before You Leap' (LBYL):\n\n```python\n# LBYL (non-Pythonic):\nif key in dictionary:\n    value = dictionary[key]\nelse:\n    value = default\n\n# EAFP (Pythonic):\ntry:\n    value = dictionary[key]\nexcept KeyError:\n    value = default\n\n# Best: use .get()\nvalue = dictionary.get(key, default)\n```\n\nEAFP is preferred because:\n1. Avoids race conditions (check + use isn't atomic)\n2. Handles edge cases naturally\n3. Often faster (happy path has no overhead)"
+          }
+        ]
+      },
+      "xpReward": 5
+    }
+  ]
+}

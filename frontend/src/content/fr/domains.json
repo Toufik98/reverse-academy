@@ -1,0 +1,30 @@
+[
+  {
+    "id": "programming",
+    "name": "Programmation",
+    "description": "Concepts fondamentaux — types, algorithmes, structures de données, paradigmes.",
+    "icon": "code-2",
+    "pathCount": 3
+  },
+  {
+    "id": "web-dev",
+    "name": "Développement Web",
+    "description": "HTTP, APIs, frameworks frontend, architecture backend, déploiement.",
+    "icon": "globe",
+    "pathCount": 1
+  },
+  {
+    "id": "systems",
+    "name": "Systèmes",
+    "description": "Systèmes d'exploitation, réseaux, bases de données, infrastructure.",
+    "icon": "cpu",
+    "pathCount": 1
+  },
+  {
+    "id": "stem",
+    "name": "Sciences",
+    "description": "Mathématiques, physique et sciences appliquées à travers le code.",
+    "icon": "calculator",
+    "pathCount": 0
+  }
+]

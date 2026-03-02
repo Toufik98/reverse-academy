@@ -1,0 +1,325 @@
+{
+  "id": "ts-error-detective",
+  "slug": "typescript-error-detective",
+  "title": "TypeScript Error Detective",
+  "domain": "programming",
+  "mode": "fix-broken",
+  "difficulty": "beginner",
+  "description": "A production TypeScript app is failing in CI. Sixteen bugs, sixteen concepts — from basic type annotations to advanced generics and discriminated unions. Fix every error and master the type system.",
+  "xpReward": 320,
+  "estimatedMinutes": 50,
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "The App Crashes on Deploy",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "CI reports: 'Argument of type number is not assignable to parameter of type string'. A teammate pushed this user-greeting function. The ID should display as text, but they passed the raw numeric ID.",
+        "code": "interface User {\n  id: number;\n  name: string;\n}\n\nfunction formatWelcome(displayName: string): string {\n  return `Welcome back, ${displayName}!`;\n}\n\nconst user: User = { id: 42, name: 'Alice' };\nconsole.log(formatWelcome(user.id));",
+        "language": "typescript",
+        "expectedFix": "formatWelcome(user.name)",
+        "validationRegex": "formatWelcome\\(user\\.name\\)",
+        "errorMessage": "Argument of type 'number' is not assignable to parameter of type 'string'",
+        "hint": "Look at what formatWelcome expects vs. what you're passing. Which property of user is a string?"
+      },
+      "xpReward": 10
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "Why Did That Fail?",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Type Annotations — Contracts the Compiler Enforces\n\nWhen you write `displayName: string`, you create a **compile-time contract**. The TypeScript compiler checks every call site against this contract before your code ever runs.\n\nThis is fundamentally different from JavaScript, where `formatWelcome(42)` would silently produce `\"Welcome back, 42!\"` — a bug that only surfaces in production when a user sees their numeric ID instead of their name.\n\n```typescript\n// The annotation is a contract:\nfunction formatWelcome(displayName: string): string {\n  return `Welcome back, ${displayName}!`;\n}\n\n// The compiler checks every call:\nformatWelcome(user.name);  // string → string ✓\nformatWelcome(user.id);    // number → string ✗ COMPILE ERROR\n```\n\n### The Key Insight\n\nType errors are not bugs — they are **prevented bugs**. Every red squiggly line is a runtime error that will never happen.\n\n### Return Types\n\nThe `: string` after the parentheses declares the return type. If your function accidentally returns `undefined` in some branch, the compiler catches it:\n\n```typescript\nfunction getUser(id: number): User {\n  if (id < 0) return; // ERROR: undefined is not User\n}\n```",
+        "keyInsight": "Type annotations are compile-time contracts. Every type error caught by the compiler is a runtime bug that will never reach production.",
+        "formula": null,
+        "interactiveDemo": {
+          "type": "type-playground",
+          "initialCode": "let count: number = 'five';\nlet active: boolean = 1;\nlet name: string = null;",
+          "prompt": "Fix each variable assignment to match its type annotation"
+        }
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "The Missing Property",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "The user profile page crashes: 'Property phone does not exist on type User'. The designer added a phone field to the UI, but nobody updated the TypeScript interface. The API sometimes returns phone, sometimes doesn't.",
+        "code": "interface User {\n  id: number;\n  name: string;\n  email: string;\n}\n\nfunction renderProfile(user: User): string {\n  return `\n    <h1>${user.name}</h1>\n    <p>${user.email}</p>\n    <p>${user.phone}</p>\n  `;\n}",
+        "language": "typescript",
+        "expectedFix": "phone?: string",
+        "validationRegex": "phone\\?\\s*:\\s*string",
+        "errorMessage": "Property 'phone' does not exist on type 'User'",
+        "hint": "The API sometimes returns phone, sometimes doesn't. TypeScript has syntax for properties that may or may not exist."
+      },
+      "xpReward": 10
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "title": "Interfaces — Blueprints for Objects",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Interfaces\n\nAn interface is a **structural contract** — it defines the exact shape an object must have.\n\n```typescript\ninterface User {\n  id: number;\n  name: string;\n  email: string;\n  phone?: string;   // ? means optional\n  readonly createdAt: Date;  // readonly means immutable\n}\n```\n\n### Optional Properties (`?`)\n\nWhen an API field is sometimes present, `?` tells TypeScript: this property might be `undefined`. The compiler then forces you to check before using it:\n\n```typescript\n// UNSAFE — might be undefined:\nuser.phone.replace('+', '00');\n\n// SAFE — compiler-enforced check:\nif (user.phone) {\n  user.phone.replace('+', '00');\n}\n\n// SAFE — optional chaining:\nuser.phone?.replace('+', '00');\n```\n\n### Structural Typing (Duck Typing)\n\nTypeScript uses **structural** typing, not nominal. If an object has all the required properties, it satisfies the interface — regardless of how it was created:\n\n```typescript\ninterface Point { x: number; y: number }\n\n// This works even though we never said \"implements Point\":\nconst p = { x: 10, y: 20 };\nfunction draw(point: Point) { /* ... */ }\ndraw(p); // ✓ — p has x and y, both numbers\n```",
+        "keyInsight": "Interfaces define object shapes. Optional properties (?) model real-world data where fields may be missing. TypeScript uses structural typing — shape matters, not class name.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Interface vs Type alias — when to use which",
+            "content": "**Interfaces** can be extended (`extends`) and merged (declaration merging). **Type aliases** support unions (`|`), intersections (`&`), and mapped types. Rule of thumb: use interfaces for object shapes you expect others to extend; use type aliases for unions, primitives, and computed types.\n\n```typescript\n// Interface — extendable:\ninterface Animal { name: string }\ninterface Dog extends Animal { breed: string }\n\n// Type alias — unions:\ntype Result = Success | Failure;\ntype ID = string | number;\n```"
+          },
+          {
+            "title": "readonly — immutability at the type level",
+            "content": "`readonly` prevents reassignment after creation. It's compile-time only (no runtime enforcement), but it catches mutation bugs early:\n\n```typescript\ninterface Config {\n  readonly apiUrl: string;\n  readonly maxRetries: number;\n}\n\nconst config: Config = { apiUrl: 'https://api.example.com', maxRetries: 3 };\nconfig.apiUrl = 'http://evil.com'; // COMPILE ERROR\n```\n\n`Readonly<T>` makes ALL properties readonly: `const frozen: Readonly<User> = user;`"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-5",
+      "order": 5,
+      "title": "The API Returns Two Different Shapes",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Your API returns `{ status: 'success', data: User }` or `{ status: 'error', message: string }`. The current code treats them the same and crashes when trying to access `.data` on error responses. Make the types distinguish success from error.",
+        "code": "interface ApiResponse {\n  status: string;\n  data?: any;\n  message?: string;\n}\n\nfunction handleResponse(res: ApiResponse) {\n  // This crashes when status is 'error' — data is undefined\n  console.log(res.data.name);\n}",
+        "language": "typescript",
+        "expectedFix": "status: 'success'",
+        "validationRegex": "status:\\s*['\"]success['\"]",
+        "errorMessage": "'data' is possibly undefined",
+        "hint": "Instead of one interface with optional fields, create separate interfaces for success and error — each with a literal string for status. Then combine them with |.",
+        "expectedConcepts": ["discriminated-unions", "literal-types", "type-narrowing"]
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-6",
+      "order": 6,
+      "title": "Discriminated Unions — The Most Powerful Pattern",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Discriminated Unions\n\nThis is arguably TypeScript's most important pattern. You create separate interfaces with a **literal tag** property, then combine them with `|`. TypeScript can narrow the type by checking the tag:\n\n```typescript\ninterface SuccessResponse {\n  status: 'success';       // literal type — not just any string\n  data: User;\n}\n\ninterface ErrorResponse {\n  status: 'error';         // different literal\n  message: string;\n  code: number;\n}\n\ntype ApiResponse = SuccessResponse | ErrorResponse;\n\nfunction handleResponse(res: ApiResponse) {\n  if (res.status === 'success') {\n    // TypeScript KNOWS res is SuccessResponse here\n    console.log(res.data.name);  // ✓ safe\n  } else {\n    // TypeScript KNOWS res is ErrorResponse here\n    console.log(res.message);    // ✓ safe\n  }\n}\n```\n\n### Why This Matters\n\nThis pattern models **real-world data perfectly**. APIs return different shapes depending on success/failure. Payment systems return different objects for each status. State machines have different valid properties per state.\n\n### The Three Requirements\n\n1. **Shared property** with literal types (the discriminant)\n2. **Union** of the interfaces (`type X = A | B | C`)\n3. **Narrowing check** on the discriminant property\n\n### Real-World Examples\n\n```typescript\n// Redux actions:\ntype Action = \n  | { type: 'ADD_TODO'; payload: string }\n  | { type: 'TOGGLE_TODO'; payload: number }\n  | { type: 'DELETE_TODO'; payload: number };\n\n// WebSocket messages:\ntype WSMessage =\n  | { event: 'connected'; sessionId: string }\n  | { event: 'message'; from: string; text: string }\n  | { event: 'error'; code: number; reason: string };\n```",
+        "keyInsight": "Discriminated unions combine literal types + union types + type narrowing. They model shapes that vary by state — API responses, events, actions. Check the tag, and TypeScript knows the exact shape.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Exhaustiveness checking with never",
+            "content": "TypeScript can verify you handled every case in a discriminated union:\n\n```typescript\nfunction handleAction(action: Action) {\n  switch (action.type) {\n    case 'ADD_TODO': return addTodo(action.payload);\n    case 'TOGGLE_TODO': return toggleTodo(action.payload);\n    // Forgot DELETE_TODO!\n    default:\n      const _exhaustive: never = action;\n      // ERROR: Type '{ type: \"DELETE_TODO\"; payload: number }'\n      // is not assignable to type 'never'\n  }\n}\n```\n\nThe `never` type means 'this should be unreachable'. If you miss a case, the compiler tells you."
+          },
+          {
+            "title": "How this relates to algebraic data types",
+            "content": "In type theory, discriminated unions are **tagged unions** or **sum types** — the type-level equivalent of logical OR. They appear in every typed functional language: Haskell's `data`, Rust's `enum`, OCaml's variants. TypeScript's version is structural (no explicit declaration needed), making it uniquely flexible."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-7",
+      "order": 7,
+      "title": "The Narrowing Puzzle",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "This function accepts string | number but TypeScript won't let you call .toUpperCase() on it. The if-check you wrote doesn't narrow the type correctly. Fix the type guard.",
+        "code": "function formatValue(value: string | number): string {\n  if (value) {\n    // TypeScript still sees string | number here!\n    return value.toUpperCase();\n  }\n  return String(value);\n}",
+        "language": "typescript",
+        "expectedFix": "typeof value === 'string'",
+        "validationRegex": "typeof\\s+value\\s*===\\s*['\"]string['\"]",
+        "errorMessage": "Property 'toUpperCase' does not exist on type 'number'",
+        "hint": "Truthiness checks don't narrow types (0 and '' are falsy but still valid). You need typeof to distinguish string from number.",
+        "expectedConcepts": ["type-narrowing", "typeof", "type-guards"]
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-8",
+      "order": 8,
+      "title": "Type Narrowing — How TypeScript Reads Your Code",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Type Narrowing\n\nTypeScript performs **control flow analysis** — it reads your if/else, switch, and return statements to narrow types within each branch.\n\n### Narrowing Operators\n\n| Guard | Narrows | Example |\n|-------|---------|--------|\n| `typeof x === 'string'` | Primitives | string, number, boolean, bigint, symbol |\n| `x instanceof Date` | Class instances | Date, Error, RegExp, custom classes |\n| `'key' in obj` | Property existence | Objects with optional/union properties |\n| `Array.isArray(x)` | Arrays | Unknown → T[] |\n| `x === null` | Null check | Removes null from union |\n| `x != null` | Null + undefined | Removes both null and undefined |\n\n### Why Truthiness Doesn't Narrow\n\n```typescript\nfunction format(val: string | number) {\n  if (val) {\n    // Still string | number!\n    // Because 0 (number) and '' (string) are falsy\n    // TypeScript can only remove null/undefined from truthiness\n  }\n}\n```\n\n### Custom Type Guards\n\nFor complex narrowing, write a function with a **type predicate**:\n\n```typescript\ninterface Cat { meow(): void }\ninterface Dog { bark(): void }\n\nfunction isCat(animal: Cat | Dog): animal is Cat {\n  return 'meow' in animal;\n}\n\nif (isCat(pet)) {\n  pet.meow(); // TypeScript knows it's Cat\n}\n```\n\nThe `animal is Cat` return type is a **type predicate** — it tells TypeScript how to narrow.",
+        "keyInsight": "TypeScript narrows types by analyzing your control flow. typeof, instanceof, in, and custom type guards each narrow differently. Truthiness checks only remove null/undefined.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Assertion functions",
+            "content": "TypeScript 3.7+ supports assertion functions that narrow after the call:\n\n```typescript\nfunction assertIsString(val: unknown): asserts val is string {\n  if (typeof val !== 'string') throw new Error('Not a string');\n}\n\nfunction process(input: unknown) {\n  assertIsString(input);\n  // TypeScript knows input is string from here on\n  console.log(input.toUpperCase());\n}\n```\n\nThis is useful for validation at the boundaries of your application (API inputs, form data)."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-9",
+      "order": 9,
+      "title": "The Generic Trap",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "You wrote a function to safely get the first element of any array. But TypeScript loses the type — it returns unknown. The calling code needs a number, gets unknown, and fails.",
+        "code": "function first(arr: unknown[]): unknown {\n  return arr[0];\n}\n\nconst prices: number[] = [9.99, 19.99, 29.99];\nconst cheapest: number = first(prices);\n// ERROR: Type 'unknown' is not assignable to type 'number'",
+        "language": "typescript",
+        "expectedFix": "function first<T>(arr: T[]): T",
+        "validationRegex": "<T>\\s*\\(arr:\\s*T\\[\\]\\)",
+        "errorMessage": "Type 'unknown' is not assignable to type 'number'",
+        "hint": "What if the function could 'remember' the type of array it receives? TypeScript has a way to parameterize functions with types.",
+        "expectedConcepts": ["generics", "type-parameters"]
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-10",
+      "order": 10,
+      "title": "Generics — Types That Adapt",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Generics\n\nGenerics are **type-level variables**. They let you write functions and types that work with any type while preserving exact type information.\n\n```typescript\n// Without generics — loses type info:\nfunction first(arr: unknown[]): unknown { return arr[0]; }\n\n// With generics — preserves it:\nfunction first<T>(arr: T[]): T { return arr[0]; }\n\nconst n = first([1, 2, 3]);      // TypeScript infers: number\nconst s = first(['a', 'b']);     // TypeScript infers: string\nconst u = first<User>(users);   // Explicit: User\n```\n\n### Why Not `any`?\n\n`any` turns off type checking entirely. Generics preserve checking:\n\n```typescript\nfunction firstAny(arr: any[]): any { return arr[0]; }\nconst x = firstAny([1, 2, 3]);\nx.toUpperCase(); // NO ERROR — but crashes at runtime!\n\nfunction firstGeneric<T>(arr: T[]): T { return arr[0]; }\nconst y = firstGeneric([1, 2, 3]);\ny.toUpperCase(); // COMPILE ERROR — number has no toUpperCase\n```\n\n### Generic Constraints\n\nUse `extends` to constrain what T can be:\n\n```typescript\nfunction getLength<T extends { length: number }>(thing: T): number {\n  return thing.length;\n}\n\ngetLength('hello');      // string has .length\ngetLength([1, 2, 3]);    // array has .length\ngetLength(42);           // ERROR: number has no .length\n```\n\n### The Standard Library is Generic\n\n`Array<T>`, `Promise<T>`, `Map<K, V>`, `Set<T>` — the entire standard library uses generics. `number[]` is sugar for `Array<number>`.",
+        "keyInsight": "Generics are type-level variables — they parameterize functions and types while preserving exact type information. They are the foundation of reusable, type-safe code.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Multiple type parameters",
+            "content": "Functions can have multiple generic parameters:\n\n```typescript\nfunction zip<A, B>(as: A[], bs: B[]): [A, B][] {\n  return as.map((a, i) => [a, bs[i]]);\n}\n\nconst pairs = zip([1, 2], ['a', 'b']);\n// Type: [number, string][]\n```\n\nConvention: `T` (type), `K` (key), `V` (value), `E` (element), `R` (return)."
+          },
+          {
+            "title": "Generics in interfaces and classes",
+            "content": "Generics work everywhere:\n\n```typescript\ninterface Repository<T> {\n  findById(id: string): Promise<T | null>;\n  save(entity: T): Promise<T>;\n  delete(id: string): Promise<void>;\n}\n\nclass UserRepo implements Repository<User> {\n  async findById(id: string): Promise<User | null> { /* ... */ }\n  async save(user: User): Promise<User> { /* ... */ }\n  async delete(id: string): Promise<void> { /* ... */ }\n}\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-11",
+      "order": 11,
+      "title": "The Async Type Hole",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Your fetch wrapper returns data, but TypeScript says the response body is 'any' — no type safety on the API response. Callers can access any property without errors. Type the function so callers get real types back.",
+        "code": "async function fetchJson(url: string) {\n  const res = await fetch(url);\n  if (!res.ok) throw new Error(`HTTP ${res.status}`);\n  return res.json(); // Returns Promise<any> — no safety!\n}\n\n// Caller gets any — typos pass silently\nconst user = await fetchJson('/api/user/1');\nconsole.log(user.nmae); // Typo! But no error",
+        "language": "typescript",
+        "expectedFix": "async function fetchJson<T>(url: string): Promise<T>",
+        "validationRegex": "fetchJson<T>.*Promise<T>",
+        "errorMessage": "No type safety on fetch response",
+        "hint": "Combine generics with async/await. The caller should specify what type the JSON represents: fetchJson<User>('/api/user/1')",
+        "expectedConcepts": ["async-await", "promise-types", "generics"]
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-12",
+      "order": 12,
+      "title": "Async Types and Promise<T>",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Typing Async Code\n\nEvery `async` function returns a `Promise<T>` where T is the resolved value type:\n\n```typescript\nasync function getUser(id: string): Promise<User> {\n  const res = await fetch(`/api/users/${id}`);\n  return res.json() as Promise<User>;\n}\n```\n\n### The fetch() Problem\n\n`fetch().json()` returns `Promise<any>` because the runtime doesn't know what shape the JSON has. You must tell TypeScript:\n\n```typescript\n// Generic wrapper:\nasync function fetchJson<T>(url: string): Promise<T> {\n  const res = await fetch(url);\n  if (!res.ok) throw new Error(`HTTP ${res.status}`);\n  return res.json() as T;\n}\nconst user = await fetchJson<User>('/api/user/1');\n```\n\n### Error Handling with Discriminated Unions\n\n```typescript\ntype Result<T> = \n  | { ok: true; data: T }\n  | { ok: false; error: string };\n\nasync function safeFetch<T>(url: string): Promise<Result<T>> {\n  try {\n    const res = await fetch(url);\n    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };\n    const data = await res.json() as T;\n    return { ok: true, data };\n  } catch (e) {\n    return { ok: false, error: String(e) };\n  }\n}\n```\n\nThis combines **discriminated unions** + **generics** + **async** — three patterns you've learned.",
+        "keyInsight": "Async functions return Promise<T>. Since fetch().json() returns any, you need generics or assertions to restore type safety. Combine with discriminated unions for type-safe error handling.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Runtime validation with Zod",
+            "content": "Type assertions (`as T`) trust blindly. For real safety, validate at runtime:\n\n```typescript\nimport { z } from 'zod';\n\nconst UserSchema = z.object({\n  id: z.number(),\n  name: z.string(),\n  email: z.string().email(),\n});\ntype User = z.infer<typeof UserSchema>;\n\nasync function fetchUser(id: string): Promise<User> {\n  const json = await fetch(`/api/users/${id}`).then(r => r.json());\n  return UserSchema.parse(json); // Throws if shape doesn't match\n}\n```\n\nCompile-time types AND runtime validation."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-13",
+      "order": 13,
+      "title": "The Partial Update Puzzle",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Your update function requires all User fields, but PATCH requests should accept partial updates. Someone who only wants to change their email shouldn't need to send name, phone, etc.",
+        "code": "interface User {\n  id: number;\n  name: string;\n  email: string;\n  bio: string;\n  avatarUrl: string;\n}\n\nfunction updateUser(id: number, updates: User): void {\n  // Saves to database\n}\n\n// ERROR: Missing properties\nupdateUser(1, { email: 'new@example.com' });",
+        "language": "typescript",
+        "expectedFix": "Partial<User>",
+        "validationRegex": "Partial<User>",
+        "errorMessage": "Missing properties 'id', 'name', 'bio', 'avatarUrl'",
+        "hint": "TypeScript has built-in utility types that transform existing types. One makes all properties optional.",
+        "expectedConcepts": ["utility-types", "partial", "mapped-types"]
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-14",
+      "order": 14,
+      "title": "Utility Types — Transform Without Rewriting",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Utility Types\n\nTypeScript ships with generic types that **transform** existing types:\n\n| Utility | Effect | Use Case |\n|---------|--------|----------|\n| `Partial<T>` | All properties optional | PATCH/update payloads |\n| `Required<T>` | All properties required | Ensure completeness |\n| `Pick<T, K>` | Select specific properties | API response subsets |\n| `Omit<T, K>` | Remove specific properties | Hide internal fields |\n| `Record<K, V>` | Key-value mapping | Dictionaries, lookups |\n| `Readonly<T>` | All properties readonly | Immutable config |\n\n### Real-World Usage\n\n```typescript\ninterface User {\n  id: number;\n  name: string;\n  email: string;\n  passwordHash: string;\n  createdAt: Date;\n}\n\n// API response (hide internals):\ntype PublicUser = Omit<User, 'passwordHash'>;\n\n// Update payload (optional, no id/createdAt):\ntype UpdateUser = Partial<Omit<User, 'id' | 'createdAt'>>;\n\n// Creation payload:\ntype CreateUser = Omit<User, 'id' | 'createdAt'>;\n```\n\n### How They Work: Mapped Types\n\n```typescript\n// Partial is defined as:\ntype Partial<T> = {\n  [P in keyof T]?: T[P];\n};\n// Loops over each property P in T, makes it optional (?)\n```",
+        "keyInsight": "Utility types transform existing types without rewriting. Partial, Pick, Omit, Record cover 90% of real-world type transformations. They compose: Partial<Omit<User, 'id'>>.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Building custom utility types",
+            "content": "```typescript\n// Make specific properties required:\ntype RequireFields<T, K extends keyof T> = T & Required<Pick<T, K>>;\n\ntype UserWithEmail = RequireFields<Partial<User>, 'email'>;\n// All optional, but email is required\n```"
+          },
+          {
+            "title": "Extract and Exclude — type-level filtering",
+            "content": "```typescript\ntype Status = 'active' | 'inactive' | 'banned' | 'pending';\n\ntype ActiveStatus = Extract<Status, 'active' | 'pending'>;\n// Result: 'active' | 'pending'\n\ntype SafeStatus = Exclude<Status, 'banned'>;\n// Result: 'active' | 'inactive' | 'pending'\n```\n\nExtract keeps matches, Exclude removes them."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-15",
+      "order": 15,
+      "title": "The Integration Challenge",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Combine everything. This e-commerce cart function has 3 type errors. Fix all of them: the discriminated union handling, the utility type for the update, and the generic return type.",
+        "code": "interface Product {\n  id: string;\n  name: string;\n  price: number;\n  stock: number;\n}\n\ntype CartResult =\n  | { status: 'success'; items: Product[] }\n  | { status: 'error'; message: string };\n\nfunction getCart(): CartResult {\n  return { status: 'success', items: [] };\n}\n\nfunction processCart() {\n  const result = getCart();\n  // BUG 1: Not narrowing the union\n  const total = result.items.reduce((sum, p) => sum + p.price, 0);\n\n  // BUG 2: Using full Product for partial update\n  const priceUpdate: Product = { price: 29.99 };\n\n  // BUG 3: Losing type info\n  function findProduct(products: unknown[], id: string): unknown {\n    return products.find((p: any) => p.id === id);\n  }\n}",
+        "language": "typescript",
+        "expectedFix": "result.status === 'success'",
+        "validationRegex": "result\\.status\\s*===\\s*['\"]success['\"]",
+        "hint": "Bug 1: Check result.status before accessing .items. Bug 2: Use Partial<Product>. Bug 3: Make findProduct generic.",
+        "expectedConcepts": ["discriminated-unions", "utility-types", "generics", "type-narrowing"]
+      },
+      "xpReward": 25
+    },
+    {
+      "id": "step-16",
+      "order": 16,
+      "title": "The TypeScript Mental Model",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## The Complete Picture\n\nYou've fixed 8 bugs and discovered 7 concepts. Here's how they connect:\n\n```\nType Annotations\n  define contracts for function parameters, return values\n\nInterfaces\n  define contracts for object shapes\n  optional (?) and readonly modifiers\n\nUnion Types (A | B)\n  model values that can be one of several types\n\nDiscriminated Unions\n  union types with a literal tag property\n  TypeScript narrows automatically on the tag\n\nType Narrowing\n  typeof, instanceof, in, custom type guards\n  control flow analysis in if/switch\n\nGenerics (<T>)\n  type-level variables\n  preserve type info in reusable code\n  constraints via 'extends'\n\nUtility Types\n  Partial, Pick, Omit, Record, Readonly\n  transform types without rewriting\n  built on mapped types (keyof + in)\n```\n\n### The Mental Shift\n\nTypeScript is a **proof system**. Every type annotation is a logical proposition the compiler verifies. When your code compiles, you have a guarantee: shapes match, nulls are checked, branches are exhaustive.\n\n### Where to Go Next\n\n- **Conditional types**: `T extends U ? X : Y` — if-else at the type level\n- **Template literal types**: `` type Route = `/api/${string}` `` — pattern-match strings\n- **Infer keyword**: Extract types from complex structures\n- **Module augmentation**: Extend third-party library types",
+        "keyInsight": "TypeScript's type system is a proof system. Annotations, interfaces, unions, generics, and narrowing work together to guarantee correctness at compile time — before a single line runs.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "The Curry-Howard correspondence",
+            "content": "When you write `function add(a: number, b: number): number`, you state a theorem: 'given two numbers, this produces a number.' The compiler proves it by checking every code path. This connection between types-as-propositions and programs-as-proofs is the Curry-Howard correspondence — foundational to type theory."
+          },
+          {
+            "title": "TypeScript's intentional unsoundness",
+            "content": "TypeScript has known holes by design:\n\n- `as` assertions bypass checking\n- `any` opts out entirely\n- Covariant arrays: `Dog[]` assignable to `Animal[]` (technically unsound)\n- Index signatures don't guarantee key existence\n\nThese are intentional trade-offs for JavaScript compatibility. Strict mode + eslint catches most issues in practice."
+          }
+        ]
+      },
+      "xpReward": 10
+    }
+  ]
+}

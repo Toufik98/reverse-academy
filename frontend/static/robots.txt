@@ -1,0 +1,12 @@
+# Reverse Academy
+# https://reverse.academy
+
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://reverse.academy/sitemap.xml
+
+# Disallow admin/internal paths
+Disallow: /api/
+Disallow: /auth/

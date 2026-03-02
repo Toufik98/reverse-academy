@@ -1,0 +1,65 @@
+[
+  {
+    "id": "first-bug",
+    "slug": "first-bug",
+    "title": "Premier Bug Écrasé",
+    "description": "Complétez votre première étape de défi.",
+    "icon": "bug",
+    "xpBonus": 10,
+    "criteriaJson": "{\"type\":\"step_count\",\"stepType\":\"challenge\",\"count\":1}"
+  },
+  {
+    "id": "aha-moment",
+    "slug": "aha-moment",
+    "title": "Moment Eurêka",
+    "description": "Débloquez votre première révélation théorique.",
+    "icon": "lightbulb",
+    "xpBonus": 10,
+    "criteriaJson": "{\"type\":\"step_count\",\"stepType\":\"reveal\",\"count\":1}"
+  },
+  {
+    "id": "speed-runner",
+    "slug": "speed-runner",
+    "title": "Sprinter",
+    "description": "Complétez un défi du premier coup.",
+    "icon": "zap",
+    "xpBonus": 25,
+    "criteriaJson": "{\"type\":\"first_attempt\",\"count\":1}"
+  },
+  {
+    "id": "perfect-path",
+    "slug": "perfect-path",
+    "title": "Parcours Parfait",
+    "description": "Complétez un parcours d'apprentissage entier sans utiliser d'indices.",
+    "icon": "award",
+    "xpBonus": 50,
+    "criteriaJson": "{\"type\":\"path_no_hints\",\"count\":1}"
+  },
+  {
+    "id": "deep-diver",
+    "slug": "deep-diver",
+    "title": "Plongeur des Profondeurs",
+    "description": "Lisez toutes les sections théoriques dépliables d'un parcours.",
+    "icon": "layers",
+    "xpBonus": 20,
+    "criteriaJson": "{\"type\":\"all_expandable_read\",\"count\":1}"
+  },
+  {
+    "id": "streak-3",
+    "slug": "streak-3",
+    "title": "Trois d'Affilée",
+    "description": "Complétez 3 étapes dans une seule session.",
+    "icon": "flame",
+    "xpBonus": 15,
+    "criteriaJson": "{\"type\":\"session_streak\",\"count\":3}"
+  },
+  {
+    "id": "builder",
+    "slug": "builder",
+    "title": "Bâtisseur",
+    "description": "Complétez votre premier parcours d'apprentissage.",
+    "icon": "trophy",
+    "xpBonus": 50,
+    "criteriaJson": "{\"type\":\"path_complete\",\"count\":1}"
+  }
+]

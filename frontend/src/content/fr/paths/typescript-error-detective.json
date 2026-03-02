@@ -1,0 +1,291 @@
+{
+  "id": "typescript-error-detective",
+  "slug": "typescript-error-detective",
+  "title": "TypeScript : Détective d'Erreurs",
+  "domain": "programming",
+  "mode": "fix-broken",
+  "difficulty": "beginner",
+  "description": "Chaque erreur TypeScript rouge vif dans votre éditeur est un bug évité. Corrigez 8 vrais scénarios de production avec des types cassés — et comprenez les annotations de types, les interfaces, les unions discriminées, les génériques, l'async/await et les types utilitaires.",
+  "xpReward": 320,
+  "estimatedMinutes": 50,
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "title": "L'argument qu'il n'accept pas",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Cette fonction calcule le prix total d'un panier. L'appeler avec une quantité sous forme de chaîne (depuis un formulaire) donne 'NaN' au lieu d'un nombre. Le type de retour de TypeScript ment — il dit 'number' mais c'est en réalité NaN.",
+        "code": "function calculateTotal(price: number, quantity: number): number {\n  return price * quantity;\n}\n\n// Ceci vient d'un champ de formulaire — c'est toujours une string !\nconst userInput = document.getElementById('qty') as HTMLInputElement;\nconst total = calculateTotal(29.99, userInput.value);\nconsole.log(total); // NaN — pas un nombre !",
+        "language": "typescript",
+        "hint": "userInput.value est une string, pas un number. TypeScript le signale si vous vérifiez les types. Utilisez parseInt() ou Number() pour convertir, et laissez TypeScript empêcher le mismatch de types.",
+        "expectedConcepts": ["type-annotations", "type-coercion", "input-validation"],
+        "validationRegex": "parseInt|Number\\(|parseFloat|\\+userInput",
+        "expectedFix": "const total = calculateTotal(29.99, Number(userInput.value));"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "title": "Annotations de Types — Votre Premier Filet de Sécurité",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Annotations de Types\n\nTypeScript ajoute des annotations de types au JavaScript — elles sont supprimées à la compilation et n'existent qu'au moment du développement.\n\n```typescript\n// JavaScript : aucun filet de sécurité\nfunction add(a, b) { return a + b; }\nadd(5, \"3\")  // \"53\" — concaténation de chaînes !\n\n// TypeScript : erreur à la compilation\nfunction add(a: number, b: number): number { return a + b; }\nadd(5, \"3\")  // ❌ TS2345 : '\"3\"' n'est pas assignable au type 'number'\n```\n\n### Types Primitifs\n\n```typescript\nlet name: string = \"Alice\";\nlet age: number = 30;\nlet active: boolean = true;\nlet data: null = null;\nlet missing: undefined = undefined;\n```\n\n### Tableaux & Tuples\n\n```typescript\nlet scores: number[] = [95, 87, 92];\nlet pair: [string, number] = [\"Alice\", 30];  // longueur et types fixés\n```\n\n### Le Mot-Clé `any` — La Trappe\n\n```typescript\nlet data: any = fetchFromAPI();  // PAS DE VÉRIFICATION DE TYPE\ndata.foo.bar.baz();  // Aucune erreur à la compilation — crash à l'exécution\n```\n\n`any` désactive TypeScript pour cette variable. Utilisez `unknown` à la place — ça force la vérification de type avant utilisation.\n\n### Inférence de Types\n\nTypeScript déduit les types quand c'est évident :\n\n```typescript\nlet x = 42;        // TypeScript sait : number\nlet s = \"hello\";   // TypeScript sait : string\nlet arr = [1, 2];  // TypeScript sait : number[]\n```",
+        "keyInsight": "Les annotations de types capturent les bugs au moment de l'écriture du code, pas quand les utilisateurs les rencontrent. Elles documentent les contrats de fonctions et permettent l'autocomplétion. Évitez 'any' — utilisez 'unknown' quand le type est vraiment inconnu.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Le mode strict de TypeScript",
+            "content": "Activez le mode strict dans `tsconfig.json` :\n\n```json\n{\n  \"compilerOptions\": {\n    \"strict\": true\n  }\n}\n```\n\nCela active :\n- `strictNullChecks` — null/undefined doivent être gérés explicitement\n- `noImplicitAny` — les paramètres non typés sont des erreurs\n- `strictFunctionTypes` — les types de fonctions sont vérifiés correctement\n\nToujours commencer de nouveaux projets avec le mode strict."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "title": "La Propriété Manquante",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Vous décodez des utilisateurs depuis une réponse API. Le code plante avec 'Cannot read property email of undefined' — parce que l'API ne retourne pas toujours un email. Corrigez l'interface pour modéliser les données réelles.",
+        "code": "interface User {\n  id: number;\n  name: string;\n  email: string;\n  phone: string;\n}\n\nasync function fetchUser(id: number): Promise<User> {\n  const res = await fetch(`/api/users/${id}`);\n  return res.json();\n}\n\nconst user = await fetchUser(1);\n// BUG : l'API renvoie { id: 1, name: \"Alice\" } — pas d'email ni de phone !\nconsole.log(user.email.toLowerCase()); // 💥 Cannot read property 'toLowerCase' of undefined",
+        "language": "typescript",
+        "hint": "Tous les champs ne sont pas toujours présents. Marquez email et phone comme optionnels avec ? (email?: string). Puis vérifiez avant d'utiliser : if (user.email) { ... }",
+        "expectedConcepts": ["interfaces", "optional-properties", "null-safety"],
+        "validationRegex": "email\\?:|phone\\?:",
+        "expectedFix": "email?: string;\n  phone?: string;"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "title": "Interfaces et Propriétés Optionnelles",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Interfaces\n\nLes interfaces définissent la forme des objets — quelles propriétés existent et quels sont leurs types :\n\n```typescript\ninterface Product {\n  id: number;\n  name: string;\n  price: number;\n  description?: string;  // Optionnel — peut être absent\n}\n```\n\n### Propriétés Optionnelles (`?`)\n\nLe `?` signifie que la propriété peut être `undefined` :\n\n```typescript\ninterface Config {\n  host: string;        // Obligatoire\n  port?: number;       // Optionnel (number | undefined)\n  debug?: boolean;     // Optionnel\n}\n\nconst config: Config = { host: \"localhost\" };  // Valide — port et debug absents\nconfig.port.toString();  // ❌ TS2532 : l'objet est possiblement 'undefined'\n\n// Accès sûr :\nif (config.port) {\n  console.log(config.port.toString());  // ✓ TypeScript sait que port est number\n}\n// Ou avec chaînage optionnel :\nconsole.log(config.port?.toString() ?? \"no port\");\n```\n\n### Readonly\n\n```typescript\ninterface Point {\n  readonly x: number;\n  readonly y: number;\n}\n\nconst origin: Point = { x: 0, y: 0 };\norigin.x = 5;  // ❌ Impossible d'assigner à 'x' car c'est en lecture seule\n```\n\n### Extends — Composition d'interfaces\n\n```typescript\ninterface Animal {\n  name: string;\n  sound(): string;\n}\n\ninterface Pet extends Animal {\n  owner: string;\n}\n\n// Pet a : name, sound(), ET owner\n```",
+        "keyInsight": "Les interfaces modélisent les formes d'objets. Utilisez ? pour le optionnel, readonly pour l'immutabilité, extends pour la composition. Toujours modéliser ce que l'API retourne réellement, pas ce que vous espérez.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Interface vs Type — lequel utiliser ?",
+            "content": "Les deux fonctionnent pour les formes d'objets :\n\n```typescript\n// Interface — extensible, fusionnable, meilleur pour les API publiques\ninterface User { name: string; }\ninterface User { age: number; }  // Fusion de déclarations !\n\n// Type alias — plus flexible, meilleur pour les unions/intersections\ntype Result = Success | Failure;\ntype Pair<T> = [T, T];\n```\n\nConvention : `interface` pour les formes d'objets, `type` pour les unions, intersections et utilitaires."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-5",
+      "order": 5,
+      "title": "Le Switch Impossible",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Ce gestionnaire d'événements traite les actions utilisateur. Il fonctionne pour 'click' et 'hover', mais quand le backend envoie un événement 'scroll', le code tombe dans le 'default' silencieusement. Utilisez les unions discriminées pour rendre cela type-safe.",
+        "code": "interface AppEvent {\n  type: string;\n  payload: any;\n}\n\nfunction handleEvent(event: AppEvent) {\n  switch (event.type) {\n    case 'click':\n      console.log(`Clicked at ${event.payload.x}, ${event.payload.y}`);\n      break;\n    case 'hover':\n      console.log(`Hovered over ${event.payload.elementId}`);\n      break;\n    default:\n      // On ne sait jamais quel type on a manqué !\n      console.log('Unknown event');\n  }\n}\n\nhandleEvent({ type: 'click', payload: { x: 100, y: 200 } });\nhandleEvent({ type: 'scrll', payload: {} }); // Typo silencieuse — pas d'erreur !",
+        "language": "typescript",
+        "hint": "Remplacez `type: string` par un type littéral union : type: 'click' | 'hover' | 'scroll'. Puis utilisez des unions discriminées — chaque variante a un payload typé. TypeScript intercepte l'exhaustivité.",
+        "expectedConcepts": ["discriminated-unions", "literal-types", "exhaustive-checks"],
+        "validationRegex": "'click'\\s*\\||type:\\s*'click'",
+        "expectedFix": "type AppEvent = \n  | { type: 'click'; payload: { x: number; y: number } }\n  | { type: 'hover'; payload: { elementId: string } }\n  | { type: 'scroll'; payload: { offset: number } };"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-6",
+      "order": 6,
+      "title": "Unions Discriminées et Rétrécissement de Type",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Unions Discriminées\n\nUne union discriminée utilise une propriété littérale commune (le \"discriminant\") pour distinguer les variantes :\n\n```typescript\ntype Shape =\n  | { kind: 'circle'; radius: number }\n  | { kind: 'rectangle'; width: number; height: number }\n  | { kind: 'triangle'; base: number; height: number };\n\nfunction area(shape: Shape): number {\n  switch (shape.kind) {\n    case 'circle':\n      return Math.PI * shape.radius ** 2;\n    case 'rectangle':\n      return shape.width * shape.height;\n    case 'triangle':\n      return 0.5 * shape.base * shape.height;\n  }\n}\n```\n\nTypeScript sait que dans le `case 'circle'`, `shape` a `radius` mais pas `width`.\n\n### Vérification d'Exhaustivité\n\nQue se passe-t-il si vous ajoutez 'pentagon' mais oubliez de mettre à jour le switch ?\n\n```typescript\nfunction area(shape: Shape): number {\n  switch (shape.kind) {\n    case 'circle': return Math.PI * shape.radius ** 2;\n    case 'rectangle': return shape.width * shape.height;\n    // Pas de 'triangle' ! TypeScript attrape ça :\n    default:\n      const _exhaustive: never = shape;\n      // ❌ Le type 'triangle' n'est pas assignable à 'never'\n      return _exhaustive;\n  }\n}\n```\n\n### Rétrécissement de Type\n\nTypeScript rétrécit les types par des vérifications à l'exécution :\n\n```typescript\nfunction process(value: string | number | null) {\n  if (value === null) return;    // TypeScript sait : string | number\n  if (typeof value === 'string') {\n    value.toUpperCase();          // TypeScript sait : string\n  } else {\n    value.toFixed(2);             // TypeScript sait : number\n  }\n}\n```\n\nGardes de type personnalisées :\n```typescript\nfunction isUser(obj: unknown): obj is User {\n  return typeof obj === 'object' && obj !== null && 'id' in obj;\n}\n```",
+        "keyInsight": "Les unions discriminées modélisent les données qui peuvent être de différentes formes. TypeScript rétrécit automatiquement le type dans chaque branche case/if. Le pattern 'never' dans default garantit que vous gérez chaque variante.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Cas d'utilisation réel : les réponses API",
+            "content": "Les unions discriminées excelleent pour modéliser les réponses API :\n\n```typescript\ntype ApiResponse<T> =\n  | { status: 'success'; data: T }\n  | { status: 'error'; message: string; code: number }\n  | { status: 'loading' };\n\nfunction renderUser(response: ApiResponse<User>) {\n  switch (response.status) {\n    case 'loading': return <Spinner />;\n    case 'error': return <Error message={response.message} />;\n    case 'success': return <Profile user={response.data} />;\n  }\n}\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-7",
+      "order": 7,
+      "title": "Le Générique Qui ne Généralise Pas",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Cette fonction wrapper de fetch retourne 'any' — le code de l'appelant n'a aucune vérification de type sur la réponse. Rendez-la générique pour que l'appelant reçoive les données avec le bon type.",
+        "code": "async function fetchData(url: string) {\n  const response = await fetch(url);\n  if (!response.ok) throw new Error(`HTTP ${response.status}`);\n  const data = await response.json(); // type: any\n  return data;\n}\n\n// L'appelant n'a aucun type-safety :\nconst user = await fetchData('/api/users/1');\nconsole.log(user.nmae); // Typo ! Pas d'erreur — 'any' permet tout",
+        "language": "typescript",
+        "hint": "Ajoutez un paramètre de type générique : async function fetchData<T>(url: string): Promise<T>. L'appelant spécifie le type attendu : fetchData<User>('/api/users/1').",
+        "expectedConcepts": ["generics", "type-parameters", "type-safe-fetch"],
+        "validationRegex": "fetchData<T>|<T>\\(url",
+        "expectedFix": "async function fetchData<T>(url: string): Promise<T> {\n  const response = await fetch(url);\n  if (!response.ok) throw new Error(`HTTP ${response.status}`);\n  const data: T = await response.json();\n  return data;\n}"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-8",
+      "order": 8,
+      "title": "Génériques — Fonctions Réutilisables et Type-Safe",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Génériques\n\nLes génériques vous permettent d'écrire des fonctions qui fonctionnent avec n'importe quel type tout en préservant la type-safety :\n\n```typescript\n// Sans génériques : perd le type\nfunction first(arr: any[]): any {\n  return arr[0];\n}\n\n// Avec génériques : préserve le type\nfunction first<T>(arr: T[]): T {\n  return arr[0];\n}\n\nfirst([1, 2, 3]);       // TypeScript sait : number\nfirst(['a', 'b']);       // TypeScript sait : string\n```\n\n`T` est un paramètre de type — un espace réservé rempli quand la fonction est appelée.\n\n### Contraintes de Génériques\n\n```typescript\n// T doit avoir une propriété 'length'\nfunction longest<T extends { length: number }>(a: T, b: T): T {\n  return a.length >= b.length ? a : b;\n}\n\nlongest(\"hello\", \"hi\");     // ✓ les strings ont length\nlongest([1, 2], [1]);       // ✓ les arrays ont length\nlongest(10, 20);            // ❌ number n'a pas length\n```\n\n### Interfaces Génériques\n\n```typescript\ninterface ApiResponse<T> {\n  data: T;\n  status: number;\n  timestamp: Date;\n}\n\ntype UserResponse = ApiResponse<User>;      // data est User\ntype ProductResponse = ApiResponse<Product>; // data est Product\n```\n\n### Valeurs par Défaut des Génériques\n\n```typescript\ninterface PaginatedList<T, M = Record<string, unknown>> {\n  items: T[];\n  total: number;\n  page: number;\n  metadata: M;\n}\n\n// M par défaut à Record<string, unknown>\ntype Users = PaginatedList<User>;\n```",
+        "keyInsight": "Les génériques sont des paramètres de type — ils laissent les fonctions et interfaces fonctionner avec n'importe quel type tout en préservant la type-safety. Utilisez extends pour les contraindre, des valeurs par défaut pour la commodité.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Cas avancé : keyof et accès indexé",
+            "content": "```typescript\nfunction getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {\n  return obj[key];\n}\n\nconst user = { name: 'Alice', age: 30, email: 'a@b.com' };\ngetProperty(user, 'name');   // type: string\ngetProperty(user, 'age');    // type: number\ngetProperty(user, 'phone');  // ❌ 'phone' n'est pas dans keyof User\n```\n\n`keyof T` produit un type union de toutes les clés de T. `T[K]` est le type de la propriété à la clé K."
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-9",
+      "order": 9,
+      "title": "La Promesse Non Tenue",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Ce code récupère deux APIs en parallèle et log les résultats. Mais il affiche des objets Promise au lieu des données réelles. L'async/await est utilisé de manière incorrecte.",
+        "code": "interface WeatherData {\n  temperature: number;\n  humidity: number;\n  city: string;\n}\n\ninterface NewsItem {\n  title: string;\n  source: string;\n}\n\nasync function getWeather(): Promise<WeatherData> {\n  const res = await fetch('/api/weather');\n  return res.json();\n}\n\nasync function getNews(): Promise<NewsItem[]> {\n  const res = await fetch('/api/news');\n  return res.json();\n}\n\nasync function loadDashboard() {\n  const weather = getWeather();  // Oublié await !\n  const news = getNews();        // Oublié await !\n  \n  console.log(`Température : ${weather.temperature}°C`); // undefined!\n  console.log(`Titres : ${news.length}`); // undefined!\n}",
+        "language": "typescript",
+        "hint": "Sans await, les variables contiennent des objets Promise, pas les données. Ajoutez await — ou mieux, utilisez Promise.all() pour l'exécution parallèle avec le bon typage.",
+        "expectedConcepts": ["async-await", "promises", "parallel-execution"],
+        "validationRegex": "await\\s+getWeather|Promise\\.all",
+        "expectedFix": "const [weather, news] = await Promise.all([getWeather(), getNews()]);"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-10",
+      "order": 10,
+      "title": "Types Async — Promise<T> et Parallélisme",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Types Async en TypeScript\n\nLes fonctions `async` retournent toujours une `Promise<T>` :\n\n```typescript\nasync function fetchUser(): Promise<User> {\n  const res = await fetch('/api/user');\n  return res.json();  // TypeScript type : Promise<any> → User\n}\n\n// Sans await : vous obtenez la Promise, pas la donnée\nconst promise = fetchUser();  // type: Promise<User>\nconst user = await fetchUser(); // type: User\n```\n\n### Exécution Parallèle avec Promise.all\n\n```typescript\n// Séquentiel : 2s (1s + 1s)\nconst users = await fetchUsers();   // 1s\nconst posts = await fetchPosts();   // 1s après\n\n// Parallèle : 1s (les deux en même temps)\nconst [users, posts] = await Promise.all([\n  fetchUsers(),  // 1s en parallèle\n  fetchPosts(),  // 1s en parallèle\n]);\n// TypeScript déduit : [User[], Post[]]\n```\n\n### Gestion d'Erreur\n\n```typescript\n// Promise.allSettled — n'échoue jamais, rapporte les résultats individuels\nconst results = await Promise.allSettled([\n  fetchUsers(),\n  fetchPosts(),\n]);\n\nfor (const result of results) {\n  if (result.status === 'fulfilled') {\n    console.log(result.value);  // données\n  } else {\n    console.error(result.reason); // erreur\n  }\n}\n```",
+        "keyInsight": "Les fonctions async retournent Promise<T>. Sans await, vous obtenez la Promise, pas la valeur. Utilisez Promise.all() pour le parallèle, Promise.allSettled() quand les échecs partiels sont acceptables.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Anti-pattern courant : await dans les boucles",
+            "content": "```typescript\n// ❌ Séquentiel — chaque requête attend la précédente\nfor (const id of userIds) {\n  const user = await fetchUser(id);  // 100ms × 100 = 10 secondes\n  users.push(user);\n}\n\n// ✓ Parallèle — toutes les requêtes en même temps\nconst users = await Promise.all(\n  userIds.map(id => fetchUser(id))  // 100ms total\n);\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-11",
+      "order": 11,
+      "title": "Le Partial Qui Ne Marche Pas",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Votre endpoint de mise à jour utilisateur accepte des mises à jour partielles (seul le nom, ou seul l'email). Mais le type de paramètre exige TOUS les champs. Utilisez un type utilitaire TS pour rendre tous les champs optionnels.",
+        "code": "interface User {\n  id: number;\n  name: string;\n  email: string;\n  avatar: string;\n}\n\nfunction updateUser(id: number, updates: User) {\n  // Envoie un PATCH au serveur\n  return fetch(`/api/users/${id}`, {\n    method: 'PATCH',\n    body: JSON.stringify(updates),\n  });\n}\n\n// Ne fonctionnera pas — 'avatar' est manquant :\nupdateUser(1, { id: 1, name: 'Alice', email: 'alice@new.com' });\n// ❌ Property 'avatar' is missing",
+        "language": "typescript",
+        "hint": "Utilisez Partial<User> — il rend toutes les propriétés optionnelles. Ou combinez : Omit<User, 'id'> pour exclure id, puis Partial<> pour rendre le reste optionnel.",
+        "expectedConcepts": ["utility-types", "partial", "omit", "pick"],
+        "validationRegex": "Partial<User>|Partial<Omit|Pick<User",
+        "expectedFix": "function updateUser(id: number, updates: Partial<Omit<User, 'id'>>) {"
+      },
+      "xpReward": 15
+    },
+    {
+      "id": "step-12",
+      "order": 12,
+      "title": "Types Utilitaires — Transformer les Types Existants",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Types Utilitaires Intégrés\n\nTypeScript fournit des types utilitaires qui transforment les types existants :\n\n### Partial<T> — Tout Optionnel\n\n```typescript\ntype UserUpdate = Partial<User>;\n// Équivalent à : { id?: number; name?: string; email?: string; avatar?: string; }\n```\n\n### Required<T> — Tout Obligatoire\n\n```typescript\ntype CompleteUser = Required<UserUpdate>;\n// Retire tous les ? — tout est obligatoire\n```\n\n### Pick<T, K> — Sélectionner des Champs\n\n```typescript\ntype UserPreview = Pick<User, 'id' | 'name'>;\n// { id: number; name: string }\n```\n\n### Omit<T, K> — Exclure des Champs\n\n```typescript\ntype CreateUser = Omit<User, 'id'>;\n// { name: string; email: string; avatar: string } — pas d'id\n```\n\n### Combinaison — Modéliser les Opérations CRUD\n\n```typescript\ninterface User {\n  id: number;\n  name: string;\n  email: string;\n  createdAt: Date;\n}\n\ntype CreateUser = Omit<User, 'id' | 'createdAt'>;\ntype UpdateUser = Partial<Omit<User, 'id' | 'createdAt'>>;\ntype UserResponse = Readonly<User>;\n```\n\n### Record<K, V> — Construire des Types Dictionnaire\n\n```typescript\ntype UserRoles = Record<string, 'admin' | 'editor' | 'viewer'>;\nconst roles: UserRoles = {\n  'user-1': 'admin',\n  'user-2': 'editor',\n};\n```",
+        "keyInsight": "Les types utilitaires transforment des types existants : Partial rend tout optionnel, Pick sélectionne des champs, Omit exclut des champs, Readonly empêche la mutation. Combinez-les pour modéliser les opérations CRUD.",
+        "formula": null,
+        "expandableSections": [
+          {
+            "title": "Construire vos propres types utilitaires",
+            "content": "Vous pouvez créer des types utilitaires personnalisés avec des types conditionnels et des types mappés :\n\n```typescript\n// Rendre certains champs obligatoires, le reste optionnel :\ntype RequireFields<T, K extends keyof T> = \n  Required<Pick<T, K>> & Partial<Omit<T, K>>;\n\ntype UpdateUser = RequireFields<User, 'id'>;\n// id est obligatoire, tout le reste optionnel\n```"
+          }
+        ]
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-13",
+      "order": 13,
+      "title": "Le Null Surprise du Tableau",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Ce code filtre un tableau de résultats de recherche, certains pouvant être null (résultats expirés). Après filtrage, TypeScript pense toujours que le tableau contient des nulls — les opérations suivantes sur le tableau sont signalées.",
+        "code": "interface SearchResult {\n  id: number;\n  title: string;\n  score: number;\n}\n\nconst rawResults: (SearchResult | null)[] = [\n  { id: 1, title: 'TypeScript Guide', score: 0.95 },\n  null,\n  { id: 3, title: 'JavaScript Basics', score: 0.82 },\n  null,\n];\n\n// Filtrer les nulls\nconst results = rawResults.filter(r => r !== null);\n\n// ❌ TypeScript dit toujours : (SearchResult | null)[]\nresults.forEach(r => {\n  console.log(r.title.toUpperCase()); // ❌ 'r' est possiblement 'null'\n});",
+        "language": "typescript",
+        "hint": "Array.filter() ne rétrécit pas les types par défaut. Utilisez un prédicat de type : filter((r): r is SearchResult => r !== null). Le 'r is SearchResult' indique à TypeScript que les valeurs filtrées sont définitivement SearchResult.",
+        "expectedConcepts": ["type-predicates", "array-filter", "type-narrowing"],
+        "validationRegex": "r is SearchResult|is SearchResult =>",
+        "expectedFix": "const results = rawResults.filter((r): r is SearchResult => r !== null);"
+      },
+      "xpReward": 20
+    },
+    {
+      "id": "step-14",
+      "order": 14,
+      "title": "Gardes et Prédicats de Type",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Gardes de Type — Dire à TypeScript Ce Que Vous Savez\n\nParfois vous savez qu'une vérification à l'exécution prouve un type. Les gardes de type l'encodent :\n\n### Gardes Intégrées\n\n```typescript\nfunction process(x: string | number) {\n  if (typeof x === 'string') {\n    x.toUpperCase();  // TS sait : string\n  } else {\n    x.toFixed(2);     // TS sait : number\n  }\n}\n```\n\n### Prédicats de Type Personnalisés\n\nQuand `typeof` ne suffit pas, définissez un prédicat :\n\n```typescript\ninterface Cat { meow(): void; whiskers: number; }\ninterface Dog { bark(): void; tailWag: boolean; }\n\nfunction isCat(animal: Cat | Dog): animal is Cat {\n  return 'meow' in animal;\n}\n\nfunction handle(animal: Cat | Dog) {\n  if (isCat(animal)) {\n    animal.meow();     // TS sait : Cat\n    animal.whiskers;   // ✓\n  } else {\n    animal.bark();     // TS sait : Dog\n    animal.tailWag;    // ✓\n  }\n}\n```\n\n### Gardes de Type avec filter()\n\n```typescript\n// Sans garde : (T | null)[]\nconst items = array.filter(x => x !== null);\n\n// Avec garde : T[]\nconst items = array.filter((x): x is T => x !== null);\n\n// Pattern utilitaire :\nfunction notNull<T>(value: T | null | undefined): value is T {\n  return value != null;\n}\nconst items = array.filter(notNull); // T[]\n```",
+        "keyInsight": "Les gardes de type (typeof, instanceof, in, prédicats personnalisés) informent le compilateur TypeScript des vérifications à l'exécution. Utilisez 'x is Type' dans les fonctions de filtre pour rétrécir correctement les types de tableaux.",
+        "formula": null,
+        "expandableSections": []
+      },
+      "xpReward": 5
+    },
+    {
+      "id": "step-15",
+      "order": 15,
+      "title": "Défi Final : Le Client API Type-Safe",
+      "type": "challenge",
+      "content": {
+        "type": "challenge",
+        "scenario": "Combinez tout : corrigez ce client API e-commerce. Il a des interfaces mal typées, des réponses non gérées, et pas de sécurité de type. Appliquez interfaces, génériques, unions discriminées et types utilitaires.",
+        "code": "// Tout est 'any' — aucune sécurité de type !\nasync function apiCall(method: string, path: string, body?: any): Promise<any> {\n  const res = await fetch(path, {\n    method,\n    body: body ? JSON.stringify(body) : undefined,\n    headers: { 'Content-Type': 'application/json' },\n  });\n  return res.json();\n}\n\n// Pas de types — l'appelant ne sait pas ce qu'il reçoit\nconst product = await apiCall('GET', '/api/products/1');\nconsole.log(product.prce); // Typo — pas d'erreur !",
+        "language": "typescript",
+        "hint": "1. Définissez les interfaces Product, CartItem, etc. 2. Rendez apiCall générique : apiCall<T>. 3. Utilisez une union discriminée pour ApiResponse<T>. 4. Ajoutez la gestion d'erreurs typée.",
+        "expectedConcepts": ["generics", "interfaces", "utility-types", "discriminated-unions"],
+        "validationRegex": "apiCall<T>|interface Product|Promise<ApiResponse",
+        "expectedFix": "async function apiCall<T>(method: string, path: string, body?: unknown): Promise<ApiResponse<T>>"
+      },
+      "xpReward": 25
+    },
+    {
+      "id": "step-16",
+      "order": 16,
+      "title": "Vue d'Ensemble — Le Système de Types en Action",
+      "type": "reveal",
+      "content": {
+        "type": "reveal",
+        "theory": "## Le Système de Types TypeScript — Vue d'Ensemble\n\nVous avez construit un client API type-safe. Voici comment chaque concept s'emboîte :\n\n### Les Couches de Type Safety\n\n```\n┌────────────────────────────────────────────┐\n│  Types Utilitaires (Partial, Pick, Omit)   │  Transformer les types\n├────────────────────────────────────────────┤\n│  Génériques <T>                            │  Code réutilisable\n├────────────────────────────────────────────┤\n│  Unions Discriminées                       │  Modéliser les variantes\n├────────────────────────────────────────────┤\n│  Interfaces / Type Aliases                 │  Formes d'objets\n├────────────────────────────────────────────┤\n│  Types Primitifs (string, number, boolean) │  Fondation\n└────────────────────────────────────────────┘\n```\n\n### Prochaines Étapes\n\n- **Types Conditionnels** : `T extends U ? X : Y`\n- **Types Mappés** : `{ [K in keyof T]: ... }`\n- **Template Literal Types** : `` `get${Capitalize<string>}` ``\n- **Types Infer** : `T extends Promise<infer U> ? U : T`\n\n### Règles d'Or\n\n1. **Jamais `any`** — utilisez `unknown` et rétrécissez\n2. **Modélisez la réalité** — vos types doivent refléter les données réelles\n3. **Préférez les unions aux booléens** — `status: 'active' | 'inactive'` au lieu de `isActive: boolean`\n4. **Les erreurs du compilateur sont vos amies** — chaque erreur est un bug évité en production",
+        "keyInsight": "TypeScript construit la sécurité par couches : types primitifs → interfaces → unions discriminées → génériques → types utilitaires. Chaque couche prévient une catégorie de bugs. Les erreurs du compilateur vous protègent.",
+        "formula": null,
+        "expandableSections": []
+      },
+      "xpReward": 10
+    }
+  ]
+}

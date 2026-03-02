@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+dist/
+build/
+.svelte-kit/
+target/
+*.log
+.DS_Store
+.turso/
+piston-packages/
+local.db
+*.db
+*.db-shm
+*.db-wal

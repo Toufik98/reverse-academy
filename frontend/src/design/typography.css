@@ -1,0 +1,79 @@
+/* ============================================================
+   Reverse Academy — Typography
+   Three-font system: Fraunces (display), Satoshi (body), JetBrains Mono (code)
+   ============================================================ */
+
+/* Fraunces — Display / Headings */
+@font-face {
+	font-family: 'Fraunces';
+	src: url('/fonts/Fraunces-Variable.woff2') format('woff2');
+	font-weight: 100 900;
+	font-display: swap;
+	font-style: normal;
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+		U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+		U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Satoshi — Body / UI */
+@font-face {
+	font-family: 'Satoshi';
+	src: url('/fonts/Satoshi-Variable.woff2') format('woff2');
+	font-weight: 300 900;
+	font-display: swap;
+	font-style: normal;
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+		U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+		U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* JetBrains Mono — Code / Technical */
+@font-face {
+	font-family: 'JetBrains Mono';
+	src: url('/fonts/JetBrainsMono-Variable.woff2') format('woff2');
+	font-weight: 100 800;
+	font-display: swap;
+	font-style: normal;
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+		U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+		U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Heading utilities */
+h1, h2, h3, h4, h5, h6,
+.heading {
+	font-family: var(--font-display);
+	letter-spacing: -0.02em;
+	line-height: 1.2;
+	font-weight: 700;
+}
+
+h1 { font-size: var(--text-3xl); }
+h2 { font-size: var(--text-2xl); }
+h3 { font-size: var(--text-xl); }
+h4 { font-size: var(--text-lg); }
+
+/* Body text */
+p, li, label, span, div {
+	font-family: var(--font-body);
+}
+
+/* Code */
+code, pre, kbd, samp,
+.code {
+	font-family: var(--font-mono);
+	font-size: var(--text-sm);
+	line-height: 1.5;
+}
+
+/* Inline code */
+:not(pre) > code {
+	background: var(--code-bg);
+	padding: 0.15em 0.35em;
+	font-size: 0.9em;
+}
+
+/* Tabular numbers for stats */
+.tabular-nums {
+	font-variant-numeric: tabular-nums;
+}
