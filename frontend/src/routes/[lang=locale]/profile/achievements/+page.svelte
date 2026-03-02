@@ -62,6 +62,6 @@
       </span>
     </div>
 
-    <AchievementGrid achievements={allAchievements} earned={userAchievements.map((a) => a.slug)} />
+    <AchievementGrid achievements={allAchievements} earned={userAchievements} />
   </div>
 </main>

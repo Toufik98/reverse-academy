@@ -3,7 +3,13 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { createAdminT } from '$lib/i18n/admin';
 	import type { SupportedLocale } from '$types/i18n';
-	import type { LearningPath, Step } from '$types/path';
+	import type { LearningPath, Step, StepContent } from '$types/path';
+
+	/** Access a property from a StepContent union safely. */
+	function contentField(content: StepContent | undefined, field: string): any {
+		if (!content) return undefined;
+		return (content as Record<string, any>)[field];
+	}
 
 	export let data: {
 		path: LearningPath;
@@ -507,28 +513,28 @@
 							{:else}
 								<!-- View mode -->
 								<div class="step-preview">
-									{#if step.content?.scenario}
+									{#if contentField(step.content, 'scenario')}
 										<div class="preview-block">
 											<span class="preview-label">{t('steps.scenario')}</span>
-											<p>{step.content.scenario}</p>
+											<p>{contentField(step.content, 'scenario')}</p>
 										</div>
 									{/if}
-									{#if step.content?.theory}
+									{#if contentField(step.content, 'theory')}
 										<div class="preview-block">
 											<span class="preview-label">{t('steps.theory')}</span>
-											<p class="theory-preview">{step.content.theory.slice(0, 300)}{step.content.theory.length > 300 ? '...' : ''}</p>
+											<p class="theory-preview">{contentField(step.content, 'theory').slice(0, 300)}{contentField(step.content, 'theory').length > 300 ? '...' : ''}</p>
 										</div>
 									{/if}
-									{#if step.content?.keyInsight}
+									{#if contentField(step.content, 'keyInsight')}
 										<div class="preview-block">
 											<span class="preview-label">{t('steps.keyInsight')}</span>
-											<p>{step.content.keyInsight}</p>
+											<p>{contentField(step.content, 'keyInsight')}</p>
 										</div>
 									{/if}
-									{#if step.content?.code}
+									{#if contentField(step.content, 'code')}
 										<div class="preview-block">
-											<span class="preview-label">{t('steps.code')} ({step.content.language || 'unknown'})</span>
-											<pre class="code-preview">{step.content.code}</pre>
+											<span class="preview-label">{t('steps.code')} ({contentField(step.content, 'language') || 'unknown'})</span>
+											<pre class="code-preview">{contentField(step.content, 'code')}</pre>
 										</div>
 									{/if}
 								</div>

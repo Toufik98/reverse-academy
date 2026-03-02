@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, createEventDispatcher } from 'svelte';
+	import { onMount, onDestroy, createEventDispatcher } from 'svelte';
 	import { Play, RotateCcw } from 'lucide-svelte';
 	import { locale } from '$stores/locale';
 	import { settings } from '$stores/settings';
@@ -90,6 +90,10 @@
 		}
 	}
 
+	onDestroy(() => {
+		editorView?.destroy();
+	});
+
 	onMount(async () => {
 		// Restore from auto-save
 		if (browser && pathSlug && stepId) {
@@ -157,8 +161,6 @@
 			state,
 			parent: editorContainer
 		});
-
-		return () => editorView?.destroy();
 	});
 </script>
 

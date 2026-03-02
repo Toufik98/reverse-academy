@@ -35,6 +35,7 @@
 	$: challengeContent = isChallenge ? (step.content as ChallengeContent) : null;
 	$: sandboxContent = isSandbox ? (step.content as SandboxContent) : null;
 	$: revealContent = isReveal ? (step.content as RevealContent) : null;
+	$: presenterContent = (challengeContent ?? sandboxContent) as ChallengeContent | SandboxContent;
 
 	// Get code and language for the editor
 	$: editorCode = challengeContent?.code || sandboxContent?.initialCode || '';
@@ -129,7 +130,7 @@
 		<h1 class="step-title">{step.title}</h1>
 
 		{#if step.content && (isChallenge || isSandbox)}
-			<ProblemPresenter content={challengeContent || sandboxContent} />
+			<ProblemPresenter content={presenterContent} />
 		{/if}
 
 		{#if isChallenge || isSandbox}

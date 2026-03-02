@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { GITHUB_CLIENT_ID, GITHUB_REDIRECT_URI } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 /**
  * GitHub OAuth initiation — redirects to GitHub authorization URL.
@@ -29,8 +29,8 @@ export const GET: RequestHandler = async ({ url, cookies, params }) => {
     maxAge: 60 * 10,
   });
 
-  const clientId = GITHUB_CLIENT_ID;
-  const redirectUri = GITHUB_REDIRECT_URI ?? `${url.origin}/api/v1/auth/github/callback`;
+  const clientId = env.GITHUB_CLIENT_ID ?? '';
+  const redirectUri = env.GITHUB_REDIRECT_URI ?? `${url.origin}/api/v1/auth/github/callback`;
 
   const githubUrl = new URL('https://github.com/login/oauth/authorize');
   githubUrl.searchParams.set('client_id', clientId);

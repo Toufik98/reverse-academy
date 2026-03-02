@@ -25,10 +25,7 @@
 
 <div class="settings-page">
 	<h1 class="page-title">{t.title}</h1>
-	<SettingsForm
-		preferences={data.preferences || {}}
-		on:save={handleSave}
-	/>
+	<SettingsForm />
 </div>
 
 <style>

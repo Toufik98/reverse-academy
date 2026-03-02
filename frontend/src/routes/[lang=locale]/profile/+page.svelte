@@ -12,7 +12,7 @@
 
 	$: user = data.user;
 	$: achievements = data.achievements || [];
-	$: earnedIds = data.earnedAchievementIds || [];
+	$: earned = (data.earnedAchievementIds || []) as any[];
 
 	const labels = {
 		en: {
@@ -51,16 +51,12 @@
 			<span class="profile-email">{user?.email || ''}</span>
 		</div>
 		<div class="profile-level">
-			<LevelBadge level={user?.level || 1} />
+			<LevelBadge />
 		</div>
 	</header>
 
 	<section class="xp-section">
-		<XPBar
-			currentXP={user?.xp || 0}
-			levelXP={((user?.level || 1) * (user?.level || 1)) * 100}
-			nextLevelXP={(((user?.level || 1) + 1) * ((user?.level || 1) + 1)) * 100}
-		/>
+		<XPBar />
 	</section>
 
 	<section class="stats-section" aria-label={t.stats}>
@@ -83,7 +79,7 @@
 
 	<section class="achievements-section" aria-label={t.achievementsTitle}>
 		<h2 class="section-heading">{t.achievementsTitle}</h2>
-		<AchievementGrid {achievements} {earnedIds} />
+		<AchievementGrid {achievements} {earned} />
 	</section>
 </div>
 

@@ -90,31 +90,25 @@ describe('CodeSandbox — save and restore', () => {
   });
 });
 
+// Helper that mirrors the shortcut detection logic in CodeSandbox.svelte
+function isRunShortcut(event: { key: string; metaKey?: boolean; ctrlKey?: boolean }): boolean {
+  return event.key === 'Enter' && !!(event.metaKey || event.ctrlKey);
+}
+
 describe('CodeSandbox — keyboard shortcuts', () => {
   it('Cmd+Enter event detection', () => {
-    const event = new KeyboardEvent('keydown', {
-      key: 'Enter',
-      metaKey: true,
-    });
-    const isRunShortcut =
-      event.key === 'Enter' && (event.metaKey || event.ctrlKey);
-    expect(isRunShortcut).toBe(true);
+    expect(isRunShortcut({ key: 'Enter', metaKey: true })).toBe(true);
   });
 
   it('Ctrl+Enter event detection', () => {
-    const event = new KeyboardEvent('keydown', {
-      key: 'Enter',
-      ctrlKey: true,
-    });
-    const isRunShortcut =
-      event.key === 'Enter' && (event.metaKey || event.ctrlKey);
-    expect(isRunShortcut).toBe(true);
+    expect(isRunShortcut({ key: 'Enter', ctrlKey: true })).toBe(true);
   });
 
   it('plain Enter is not run shortcut', () => {
-    const event = new KeyboardEvent('keydown', { key: 'Enter' });
-    const isRunShortcut =
-      event.key === 'Enter' && (event.metaKey || event.ctrlKey);
-    expect(isRunShortcut).toBe(false);
+    expect(isRunShortcut({ key: 'Enter' })).toBe(false);
+  });
+
+  it('other key with Cmd is not run shortcut', () => {
+    expect(isRunShortcut({ key: 'a', metaKey: true })).toBe(false);
   });
 });

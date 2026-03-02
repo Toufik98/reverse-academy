@@ -6,7 +6,7 @@
 	export let achievements: Achievement[] = [];
 	export let earned: UserAchievement[] = [];
 
-	$: earnedSlugs = new Set(earned.map((e) => e.achievementSlug));
+	$: earnedSlugs = new Set(earned.map((e) => e.achievement.slug));
 </script>
 
 <div class="achievement-grid" role="list" aria-label={$locale === 'fr' ? 'Succès' : 'Achievements'}>
@@ -28,7 +28,7 @@
 			<h3 class="card-title">{achievement.title}</h3>
 			<p class="card-description">{achievement.description}</p>
 			{#if isEarned}
-				{@const earnedDate = earned.find((e) => e.achievementSlug === achievement.slug)?.earnedAt}
+				{@const earnedDate = earned.find((e) => e.achievement.slug === achievement.slug)?.earnedAt}
 				{#if earnedDate}
 					<time class="card-date" datetime={earnedDate}>
 						{new Date(earnedDate).toLocaleDateString($locale === 'fr' ? 'fr-FR' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}

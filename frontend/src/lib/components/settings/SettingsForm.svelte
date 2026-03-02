@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { locale } from '$stores/locale';
-	import { settings, syncSettings, type UserSettings } from '$stores/settings';
-	import { themeStore, toggleTheme } from '$stores/theme';
+	import { settings, type UserSettings } from '$stores/settings';
 	import { Sun, Moon, Save } from 'lucide-svelte';
 
 	let formValues: UserSettings = { ...$settings };
@@ -14,7 +13,6 @@
 		saving = true;
 		saved = false;
 		settings.set(formValues);
-		await syncSettings();
 		saving = false;
 		saved = true;
 		setTimeout(() => (saved = false), 2000);
