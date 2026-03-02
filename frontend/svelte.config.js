@@ -10,6 +10,9 @@ const config = {
 			precompress: true,
 			envPrefix: ''
 		}),
+		paths: {
+			base: process.env.BASE_PATH || ''
+		},
 		alias: {
 			$design: 'src/design',
 			$components: 'src/lib/components',
