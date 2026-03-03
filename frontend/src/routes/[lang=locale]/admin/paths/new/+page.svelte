@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import { createAdminT } from '$lib/i18n/admin';
 	import type { SupportedLocale } from '$types/i18n';
 
@@ -65,7 +66,7 @@
 
 			if (res.ok) {
 				const result = await res.json();
-				goto(`/${lang}/admin/paths/${result.id}`);
+				goto(`${base}/${lang}/admin/paths/${result.id}`);
 			} else {
 				const text = await res.text();
 				error = `Error (${res.status}): ${text}`;
@@ -84,7 +85,7 @@
 
 <div class="new-path-page">
 	<nav class="breadcrumb" aria-label="Breadcrumb">
-		<a href="/{lang}/admin/paths">{t('nav.paths')}</a>
+		<a href="{base}/{lang}/admin/paths">{t('nav.paths')}</a>
 		<span class="sep">/</span>
 		<span class="current">{t('dashboard.newPath')}</span>
 	</nav>
@@ -157,7 +158,7 @@
 			{/if}
 
 			<div class="form-footer">
-				<a href="/{lang}/admin/paths" class="btn btn-secondary">{t('steps.cancel')}</a>
+				<a href="{base}/{lang}/admin/paths" class="btn btn-secondary">{t('steps.cancel')}</a>
 				<button type="submit" class="btn btn-primary" disabled={saving || !title || !slug}>
 					{saving ? t('newPath.creating') : t('newPath.create')}
 				</button>

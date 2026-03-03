@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { createAdminT } from '$lib/i18n/admin';
@@ -299,7 +300,7 @@
 <div class="editor-page">
 	<!-- Breadcrumb -->
 	<nav class="breadcrumb" aria-label="Breadcrumb">
-		<a href="/{lang}/admin/paths">{t('nav.paths')}</a>
+		<a href="{base}/{lang}/admin/paths">{t('nav.paths')}</a>
 		<span class="sep">/</span>
 		<span class="current">{path.title}</span>
 	</nav>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
   import { page } from '$app/stores';
   import SEOHead from '$components/shared/SEOHead.svelte';
   import type { PageData } from './$types';
@@ -40,7 +41,7 @@
 <main id="main-content" class="min-h-screen" style="background: var(--surface-0);">
   <div class="max-w-5xl mx-auto px-4 py-12">
     <nav class="mb-8" aria-label="Breadcrumb">
-      <a href="/{lang}/explore" class="text-sm underline" style="color: var(--accent);">
+      <a href="{base}/{lang}/explore" class="text-sm underline" style="color: var(--accent);">
         {i.backToAll}
       </a>
       <span class="mx-2" style="color: var(--text-tertiary);">/</span>
@@ -55,7 +56,7 @@
       <div class="grid gap-6 md:grid-cols-2">
         {#each data.paths as path}
           <a
-            href="/{lang}/learn/{path.slug}"
+            href="{base}/{lang}/learn/{path.slug}"
             class="block p-6 transition-transform"
             style="
               background: var(--surface-1);

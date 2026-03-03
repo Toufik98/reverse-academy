@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
   import { page } from '$app/stores';
   import SEOHead from '$components/shared/SEOHead.svelte';
   import DependencyTree from '$components/learning/DependencyTree.svelte';
@@ -56,7 +57,7 @@
 <main id="main-content" class="min-h-screen" style="background: var(--surface-0);">
   <div class="max-w-4xl mx-auto px-4 py-12">
     <nav class="mb-8" aria-label="Breadcrumb">
-      <a href="/{lang}/explore" class="text-sm underline" style="color: var(--accent);">
+      <a href="{base}/{lang}/explore" class="text-sm underline" style="color: var(--accent);">
         {i.backToExplore}
       </a>
     </nav>
@@ -106,7 +107,7 @@
         </div>
 
         <a
-          href="/{lang}/learn/{path.slug}/{path.steps?.[0]?.id ?? '1'}"
+          href="{base}/{lang}/learn/{path.slug}/{path.steps?.[0]?.id ?? '1'}"
           class="inline-flex items-center px-8 py-3 rounded-lg font-medium transition-colors"
           style="background: var(--accent); color: var(--text-inverse); min-height: 44px;"
         >

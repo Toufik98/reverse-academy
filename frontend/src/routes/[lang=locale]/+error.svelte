@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { locale } from '$stores/locale';
 	import SEOHead from '$components/shared/SEOHead.svelte';
@@ -56,7 +57,7 @@
 	{#if message}
 		<p class="error-detail">{message}</p>
 	{/if}
-	<a href="/{$locale}" class="error-cta">
+	<a href="{base}/{$locale}" class="error-cta">
 		{errorLabels.action}
 	</a>
 </div>

@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { base } from '$app/paths';
 import type { Actions } from './$types';
 
 export const actions: Actions = {
@@ -37,7 +38,7 @@ export const actions: Actions = {
 			// Set session cookie from response
 			// Redirect to onboarding
 
-			throw redirect(302, `/${locale}/onboarding`);
+			throw redirect(302, `${base}/${locale}/onboarding`);
 		} catch (err) {
 			if (err instanceof Response || (err as any)?.status === 302) throw err;
 			return {

@@ -1,4 +1,5 @@
 import type { RequestHandler } from './$types';
+import { base } from '$app/paths';
 
 /** Root route: detect Accept-Language → redirect to /en or /fr */
 export const GET: RequestHandler = ({ request, cookies }) => {
@@ -7,7 +8,7 @@ export const GET: RequestHandler = ({ request, cookies }) => {
 	if (stored === 'en' || stored === 'fr') {
 		return new Response(null, {
 			status: 302,
-			headers: { Location: `/${stored}` }
+			headers: { Location: `${base}/${stored}` }
 		});
 	}
 
@@ -28,6 +29,6 @@ export const GET: RequestHandler = ({ request, cookies }) => {
 
 	return new Response(null, {
 		status: 302,
-		headers: { Location: `/${locale}` }
+		headers: { Location: `${base}/${locale}` }
 	});
 };

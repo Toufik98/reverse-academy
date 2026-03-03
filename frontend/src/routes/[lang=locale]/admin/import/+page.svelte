@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { createAdminT } from '$lib/i18n/admin';
@@ -760,7 +761,7 @@ Hidden expandable content for curious learners.
 
 	<!-- Actions -->
 	<div class="actions">
-		<a href="/{lang}/admin/paths" class="btn btn-secondary">{t('steps.cancel')}</a>
+		<a href="{base}/{lang}/admin/paths" class="btn btn-secondary">{t('steps.cancel')}</a>
 		<button
 			class="btn btn-primary"
 			on:click={handleImport}

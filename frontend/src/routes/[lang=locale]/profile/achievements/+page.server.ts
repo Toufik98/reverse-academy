@@ -1,11 +1,12 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
+import { base } from '$app/paths';
 
 export const load: PageServerLoad = async ({ params, locals, fetch }) => {
   const { lang } = params;
 
   if (!locals.user) {
-    throw redirect(302, `/${lang}/auth/login`);
+    throw redirect(302, `${base}/${lang}/auth/login`);
   }
 
   try {

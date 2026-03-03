@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { locale } from '$stores/locale';
 	import { ArrowRight, Clock, Zap, Search } from 'lucide-svelte';
 	import SEOHead from '$components/shared/SEOHead.svelte';
@@ -63,7 +64,7 @@
 	<!-- Path grid -->
 	<div class="path-grid">
 		{#each filteredPaths as path (path.slug)}
-			<a href="/{$locale}/learn/{path.slug}" class="path-card">
+			<a href="{base}/{$locale}/learn/{path.slug}" class="path-card">
 				<div class="card-top">
 					<span class="card-domain">{path.domain}</span>
 					<span class="card-difficulty">{difficultyLabels[path.difficulty]?.[$locale] || path.difficulty}</span>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
   import { enhance } from '$app/forms';
   import { page } from '$app/stores';
   import type { ActionData } from './$types';
@@ -52,7 +53,7 @@
       {#if form?.success}
         <div role="alert" class="p-4 mb-6 rounded-lg" style="background: var(--success-muted); color: var(--success);">
           <p>{i.success}</p>
-          <a href="/{lang}/auth/login" class="underline mt-2 inline-block" style="color: var(--accent);">{i.loginLink}</a>
+          <a href="{base}/{lang}/auth/login" class="underline mt-2 inline-block" style="color: var(--accent);">{i.loginLink}</a>
         </div>
       {:else}
         {#if form?.error}

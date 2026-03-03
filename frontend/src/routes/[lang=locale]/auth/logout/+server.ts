@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { base } from '$app/paths';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params, cookies }) => {
@@ -9,5 +10,5 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 	// await fetch(`${API_URL}/auth/logout`, { headers: { Authorization: `Bearer ${sessionToken}` } });
 
 	cookies.delete('ra-session', { path: '/' });
-	throw redirect(302, `/${locale}`);
+	throw redirect(302, `${base}/${locale}`);
 };

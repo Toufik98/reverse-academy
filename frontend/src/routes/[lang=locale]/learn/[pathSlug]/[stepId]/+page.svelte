@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { locale } from '$stores/locale';
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import SEOHead from '$components/shared/SEOHead.svelte';
 	import ProblemPresenter from '$components/learning/ProblemPresenter.svelte';
 	import CodeSandbox from '$components/learning/CodeSandbox.svelte';
@@ -83,20 +84,20 @@
 	}
 
 	function navigateToStep(e: CustomEvent<{ stepId: string }>) {
-		goto(`/${$locale}/learn/${pathSlug}/${e.detail.stepId}`);
+		goto(`${base}/${$locale}/learn/${pathSlug}/${e.detail.stepId}`);
 	}
 
 	function handleNextStep() {
 		const currentIndex = path.steps.findIndex((s) => s.id === stepId);
 		if (currentIndex < path.steps.length - 1) {
-			goto(`/${$locale}/learn/${pathSlug}/${path.steps[currentIndex + 1].id}`);
+			goto(`${base}/${$locale}/learn/${pathSlug}/${path.steps[currentIndex + 1].id}`);
 		}
 	}
 
 	function handlePrevStep() {
 		const currentIndex = path.steps.findIndex((s) => s.id === stepId);
 		if (currentIndex > 0) {
-			goto(`/${$locale}/learn/${pathSlug}/${path.steps[currentIndex - 1].id}`);
+			goto(`${base}/${$locale}/learn/${pathSlug}/${path.steps[currentIndex - 1].id}`);
 		}
 	}
 

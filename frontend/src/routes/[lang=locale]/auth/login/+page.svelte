@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { locale } from '$stores/locale';
+	import { base } from '$app/paths';
 	import { ArrowRight } from 'lucide-svelte';
 	import SEOHead from '$components/shared/SEOHead.svelte';
 
@@ -57,7 +58,7 @@
 				return;
 			}
 
-			window.location.href = `/${$locale}/explore`;
+			window.location.href = `${base}/${$locale}/explore`;
 		} catch {
 			error = $locale === 'fr' ? 'Erreur réseau' : 'Network error';
 		} finally {
@@ -101,7 +102,7 @@
 				/>
 			</div>
 
-			<a href="/{$locale}/auth/forgot-password" class="forgot-link">{t.forgot}</a>
+			<a href="{base}/{$locale}/auth/forgot-password" class="forgot-link">{t.forgot}</a>
 
 			<button type="submit" class="auth-submit" disabled={loading}>
 				{loading ? t.loading : t.submit}
@@ -112,13 +113,13 @@
 			<span>{t.or}</span>
 		</div>
 
-		<a href="/{$locale}/auth/github" class="github-btn">
+		<a href="{base}/{$locale}/auth/github" class="github-btn">
 			{t.github}
 		</a>
 
 		<p class="auth-footer">
 			{t.noAccount}
-			<a href="/{$locale}/auth/register">{t.register}</a>
+			<a href="{base}/{$locale}/auth/register">{t.register}</a>
 		</p>
 	</div>
 </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { locale } from '$stores/locale';
 	import { ArrowRight, Terminal, BookOpen, Zap } from 'lucide-svelte';
 	import SEOHead from '$components/shared/SEOHead.svelte';
@@ -70,7 +71,7 @@
 		<h1 id="hero-heading" class="hero-title">{t.hero}</h1>
 		<p class="hero-subtitle">{t.subtitle}</p>
 		<div class="hero-actions">
-			<a href="/{$locale}/explore" class="btn-primary">
+			<a href="{base}/{$locale}/explore" class="btn-primary">
 				<span>{t.cta}</span>
 				<ArrowRight size={16} strokeWidth={1.5} />
 			</a>

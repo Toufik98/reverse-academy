@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
   import { page } from '$app/stores';
   import SEOHead from '$components/shared/SEOHead.svelte';
   import AchievementGrid from '$components/gamification/AchievementGrid.svelte';
@@ -41,7 +42,7 @@
 <main id="main-content" class="min-h-screen" style="background: var(--surface-0);">
   <div class="max-w-4xl mx-auto px-4 py-12">
     <nav class="mb-8" aria-label="Breadcrumb">
-      <a href="/{lang}/profile" class="text-sm underline" style="color: var(--accent);">
+      <a href="{base}/{lang}/profile" class="text-sm underline" style="color: var(--accent);">
         {i.backToProfile}
       </a>
     </nav>

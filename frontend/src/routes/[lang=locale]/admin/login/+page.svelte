@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { createAdminT } from '$lib/i18n/admin';
 	import type { SupportedLocale } from '$types/i18n';
@@ -24,7 +25,7 @@
 			if (res.ok) {
 				// Store token in cookie (httpOnly=false so JS can read; short-lived admin session)
 				document.cookie = `ra-admin-token=${token}; path=/; max-age=${60 * 60 * 8}; samesite=lax`;
-				goto(`/${lang}/admin`);
+				goto(`${base}/${lang}/admin`);
 			} else if (res.status === 401) {
 				error = t('login.invalidToken');
 			} else {
@@ -78,7 +79,7 @@
 		</form>
 
 		<div class="login-footer">
-			<a href="/{lang}" class="back-link">{t('login.backToSite')}</a>
+			<a href="{base}/{lang}" class="back-link">{t('login.backToSite')}</a>
 		</div>
 	</div>
 </div>

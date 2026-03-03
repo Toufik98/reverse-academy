@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { locale } from '$stores/locale';
+	import { base } from '$app/paths';
 	import SEOHead from '$components/shared/SEOHead.svelte';
 
 	// SvelteKit passes route params internally
@@ -65,7 +66,7 @@
 				return;
 			}
 
-			window.location.href = `/${$locale}/onboarding`;
+			window.location.href = `${base}/${$locale}/onboarding`;
 		} catch {
 			error = $locale === 'fr' ? 'Erreur réseau' : 'Network error';
 		} finally {
@@ -112,11 +113,11 @@
 
 		<div class="auth-divider"><span>{t.or}</span></div>
 
-		<a href="/{$locale}/auth/github" class="github-btn">{t.github}</a>
+		<a href="{base}/{$locale}/auth/github" class="github-btn">{t.github}</a>
 
 		<p class="auth-footer">
 			{t.hasAccount}
-			<a href="/{$locale}/auth/login">{t.login}</a>
+			<a href="{base}/{$locale}/auth/login">{t.login}</a>
 		</p>
 	</div>
 </div>

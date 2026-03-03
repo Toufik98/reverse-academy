@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { invalidateAll } from '$app/navigation';
 	import { createAdminT } from '$lib/i18n/admin';
@@ -109,8 +110,8 @@
 			<p>{data.paths.length} {t('paths.totalPaths')}, {totalSteps} {t('paths.totalSteps')}, {totalXP} {t('paths.totalXP')}</p>
 		</div>
 		<div class="header-actions">
-			<a href="/{lang}/admin/import" class="btn btn-secondary">{t('dashboard.importJson')}</a>
-			<a href="/{lang}/admin/paths/new" class="btn btn-primary">
+			<a href="{base}/{lang}/admin/import" class="btn btn-secondary">{t('dashboard.importJson')}</a>
+			<a href="{base}/{lang}/admin/paths/new" class="btn btn-primary">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 					<line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
 				</svg>
@@ -148,7 +149,7 @@
 				<article class="path-row">
 					<div class="path-info">
 						<div class="path-title-row">
-							<a href="/{lang}/admin/paths/{path.id}" class="path-title">{path.title}</a>
+							<a href="{base}/{lang}/admin/paths/{path.id}" class="path-title">{path.title}</a>
 							<div class="path-badges">
 								<span class="badge domain-badge">{path.domain}</span>
 								<span class="badge diff-badge" style="color: {diffColors[path.difficulty] || 'var(--text-secondary)'}">
@@ -175,7 +176,7 @@
 						</div>
 					</div>
 					<div class="path-actions">
-						<a href="/{lang}/admin/paths/{path.id}" class="action-btn edit-btn" title="Edit path">
+						<a href="{base}/{lang}/admin/paths/{path.id}" class="action-btn edit-btn" title="Edit path">
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 								<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
 							</svg>
@@ -212,7 +213,7 @@
 	{:else}
 		<div class="empty-state">
 			<p>{t('dashboard.noPathsYet')}</p>
-			<a href="/{lang}/admin/paths/new" class="btn btn-primary">{t('dashboard.createFirst')}</a>
+			<a href="{base}/{lang}/admin/paths/new" class="btn btn-primary">{t('dashboard.createFirst')}</a>
 		</div>
 	{/if}
 </div>

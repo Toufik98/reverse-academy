@@ -3,12 +3,13 @@
 	import OnboardingFlow from '$components/onboarding/OnboardingFlow.svelte';
 	import SEOHead from '$components/shared/SEOHead.svelte';
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 
 	// SvelteKit passes route params internally
 	export let params: Record<string, string> = {};
 
 	function handleComplete() {
-		goto(`/${$locale}/explore`);
+		goto(`${base}/${$locale}/explore`);
 	}
 </script>
 

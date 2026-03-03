@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { locale } from '$stores/locale';
 	import { ArrowRight, Clock, Zap } from 'lucide-svelte';
 	import type { LearningPath } from '$types/path';
@@ -11,7 +12,7 @@
 
 	<div class="rec-list">
 		{#each paths.slice(0, 3) as path (path.slug)}
-			<a class="rec-card" href="/{$locale}/learn/{path.slug}">
+			<a class="rec-card" href="{base}/{$locale}/learn/{path.slug}">
 				<div class="rec-info">
 					<h4 class="rec-name">{path.title}</h4>
 					<p class="rec-desc">{path.description}</p>

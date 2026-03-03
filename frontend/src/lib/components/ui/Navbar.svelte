@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { Sun, Moon, User, BookOpen, Compass, LogOut, Menu, X } from 'lucide-svelte';
 	import { theme, resolvedTheme } from '$stores/theme';
@@ -30,7 +31,7 @@
 <nav class="navbar" aria-label="Main navigation">
 	<div class="navbar-inner">
 		<!-- Logo -->
-		<a href="/{$locale}" class="logo" aria-label="Reverse Academy home">
+		<a href="{base}/{$locale}" class="logo" aria-label="Reverse Academy home">
 			<span class="logo-mark">RA</span>
 			<span class="logo-text">Reverse Academy</span>
 		</a>
@@ -39,7 +40,7 @@
 		<div class="nav-links" role="menubar">
 			{#each navItems as item}
 				<a
-					href="/{$locale}/{item.href}"
+					href="{base}/{$locale}/{item.href}"
 					class="nav-link"
 					class:active={currentPath.includes(item.href)}
 					role="menuitem"
@@ -79,11 +80,11 @@
 				</div>
 
 				<!-- Profile -->
-				<a href="/{$locale}/profile" class="nav-action-btn" aria-label="Profile">
+				<a href="{base}/{$locale}/profile" class="nav-action-btn" aria-label="Profile">
 					<User size={18} strokeWidth={1.5} />
 				</a>
 			{:else}
-				<a href="/{$locale}/auth/login" class="btn-primary">
+				<a href="{base}/{$locale}/auth/login" class="btn-primary">
 					{$locale === 'fr' ? 'Connexion' : 'Sign In'}
 				</a>
 			{/if}
@@ -109,7 +110,7 @@
 		<div class="mobile-nav" role="menu">
 			{#each navItems as item}
 				<a
-					href="/{$locale}/{item.href}"
+					href="{base}/{$locale}/{item.href}"
 					class="mobile-nav-link"
 					on:click={() => (mobileMenuOpen = false)}
 					role="menuitem"
@@ -119,7 +120,7 @@
 				</a>
 			{/each}
 			{#if authenticated}
-				<a href="/{$locale}/profile" class="mobile-nav-link" on:click={() => (mobileMenuOpen = false)}>
+				<a href="{base}/{$locale}/profile" class="mobile-nav-link" on:click={() => (mobileMenuOpen = false)}>
 					<User size={20} strokeWidth={1.5} />
 					{$locale === 'fr' ? 'Profil' : 'Profile'}
 				</a>

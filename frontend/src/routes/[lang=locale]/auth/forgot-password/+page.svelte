@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
   import { enhance } from '$app/forms';
   import type { ActionData } from './$types';
   import SEOHead from '$components/shared/SEOHead.svelte';
@@ -92,7 +93,7 @@
       </form>
 
       <p class="mt-6 text-center" style="color: var(--text-secondary); font-size: var(--text-sm);">
-        <a href="/{lang}/auth/login" class="underline" style="color: var(--accent);">
+        <a href="{base}/{lang}/auth/login" class="underline" style="color: var(--accent);">
           {i.backToLogin}
         </a>
       </p>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import SEOHead from '$components/shared/SEOHead.svelte';
@@ -67,7 +68,7 @@
           <p>{i.success}</p>
         </div>
         <a
-          href="/{lang}/auth/login"
+          href="{base}/{lang}/auth/login"
           class="inline-block px-6 py-3 rounded-lg font-medium"
           style="background: var(--accent); color: var(--text-inverse); min-height: 44px; line-height: 44px;"
         >
@@ -83,7 +84,7 @@
           <p>{i.error}</p>
         </div>
         <a
-          href="/{lang}/auth/login"
+          href="{base}/{lang}/auth/login"
           class="inline-block px-6 py-3 rounded-lg font-medium"
           style="background: var(--accent); color: var(--text-inverse); min-height: 44px; line-height: 44px;"
         >

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { createAdminT } from '$lib/i18n/admin';
 	import type { SupportedLocale } from '$types/i18n';
@@ -108,8 +109,8 @@
 		<div class="section-header">
 			<h2>{t('dashboard.learningPaths')}</h2>
 			<div class="section-actions">
-				<a href="/{lang}/admin/import" class="btn btn-secondary">{t('dashboard.importJson')}</a>
-				<a href="/{lang}/admin/paths/new" class="btn btn-primary">{t('dashboard.newPath')}</a>
+				<a href="{base}/{lang}/admin/import" class="btn btn-secondary">{t('dashboard.importJson')}</a>
+				<a href="{base}/{lang}/admin/paths/new" class="btn btn-primary">{t('dashboard.newPath')}</a>
 			</div>
 		</div>
 
@@ -130,7 +131,7 @@
 						{#each data.paths as path}
 							<tr>
 								<td class="path-title-cell">
-									<a href="/{lang}/admin/paths/{path.id}">{path.title}</a>
+									<a href="{base}/{lang}/admin/paths/{path.id}">{path.title}</a>
 									<span class="slug">{path.slug}</span>
 								</td>
 								<td>
@@ -146,7 +147,7 @@
 								<td class="num">{path.stepCount}</td>
 								<td class="num">{path.xpReward}</td>
 								<td>
-									<a href="/{lang}/admin/paths/{path.id}" class="action-link">{t('table.edit')}</a>
+									<a href="{base}/{lang}/admin/paths/{path.id}" class="action-link">{t('table.edit')}</a>
 								</td>
 							</tr>
 						{/each}
@@ -156,7 +157,7 @@
 		{:else}
 			<div class="empty-state">
 				<p>{t('dashboard.noPathsYet')}</p>
-				<a href="/{lang}/admin/paths/new" class="btn btn-primary">{t('dashboard.createFirst')}</a>
+				<a href="{base}/{lang}/admin/paths/new" class="btn btn-primary">{t('dashboard.createFirst')}</a>
 			</div>
 		{/if}
 	</section>

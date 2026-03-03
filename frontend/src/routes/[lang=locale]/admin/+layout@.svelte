@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { base } from '$app/paths';
 	import { theme, resolvedTheme } from '$stores/theme';
 	import { createAdminT } from '$lib/i18n/admin';
 	import { getAlternateLocale } from '$lib/i18n';
@@ -37,7 +38,7 @@
 
 	function handleLogout() {
 		document.cookie = 'ra-admin-token=; path=/; max-age=0';
-		goto(`/${lang}/admin/login`);
+		goto(`${base}/${lang}/admin/login`);
 	}
 </script>
 
@@ -54,7 +55,7 @@
 		<nav class="sidebar-nav" aria-label="Admin navigation">
 			{#each navItems as item}
 				<a
-					href="/{lang}/{item.href}"
+					href="{base}/{lang}/{item.href}"
 					class="nav-item"
 					class:active={isActive(item.href)}
 					aria-current={isActive(item.href) ? 'page' : undefined}
@@ -98,7 +99,7 @@
 
 			<div class="sidebar-divider"></div>
 
-			<a href="/{lang}/explore" class="nav-item" target="_blank" rel="noopener">
+			<a href="{base}/{lang}/explore" class="nav-item" target="_blank" rel="noopener">
 				<svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 					<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
 				</svg>
