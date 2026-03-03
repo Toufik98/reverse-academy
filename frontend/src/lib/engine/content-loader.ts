@@ -54,12 +54,16 @@ export async function loadAllPaths(_locale?: SupportedLocale): Promise<LearningP
 
 	// Fallback: local JSON files
 	const locale = _locale ?? 'en';
-	const modules = import.meta.glob('../../content/*/paths/*.json', { eager: true });
 	const paths: LearningPath[] = [];
 
-	for (const [path, module] of Object.entries(modules)) {
-		if (path.includes(`/${locale}/`)) {
-			paths.push((module as any).default as LearningPath);
+	// Dynamically import all path JSON files for the requested locale
+	const slugs = ['typescript-error-detective', 'python-debug-the-pipeline', 'rust-ownership-from-bugs', 'sql-query-detective', 'build-rest-api-backward'];
+	for (const slug of slugs) {
+		try {
+			const module = await import(`../../content/${locale}/paths/${slug}.json`);
+			paths.push(module.default as LearningPath);
+		} catch {
+			// skip missing files
 		}
 	}
 

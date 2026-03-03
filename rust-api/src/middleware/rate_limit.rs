@@ -71,7 +71,7 @@ impl RateLimiter {
 /// - POST /progress/*: 60/min/user
 /// - GET /*: 200/min/user
 /// - Unauthenticated: 10/min/IP
-
+///
 /// Create rate limiters for different endpoint groups.
 pub struct RateLimiters {
     pub execute: RateLimiter,
