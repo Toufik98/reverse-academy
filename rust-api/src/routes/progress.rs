@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use axum::{
     extract::{Path, State},
     Json,
@@ -53,7 +54,10 @@ pub async fn get_all_progress(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,
 ) -> Result<Json<Vec<ProgressEntry>>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut rows = conn
         .query(
@@ -95,7 +99,10 @@ pub async fn get_path_progress(
     State(state): State<Arc<AppState>>,
     Path((user_id, path_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<ProgressEntry>>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut rows = conn
         .query(
@@ -139,7 +146,10 @@ pub async fn submit_step(
     Path((user_id, step_id)): Path<(String, String)>,
     Json(req): Json<SubmitStepRequest>,
 ) -> Result<Json<SubmitResponse>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     let id = uuid::Uuid::now_v7().to_string();
 
     conn.execute(
@@ -191,7 +201,10 @@ pub async fn update_step(
     Path((user_id, step_id)): Path<(String, String)>,
     Json(req): Json<UpdateStepRequest>,
 ) -> Result<Json<ProgressEntry>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     if let Some(attempts) = req.attempts {
         conn.execute(

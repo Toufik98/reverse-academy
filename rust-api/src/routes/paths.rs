@@ -74,7 +74,10 @@ pub struct PathWithSteps {
 pub async fn list_paths(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<PathEntry>>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut rows = conn
         .query(
@@ -131,7 +134,10 @@ pub async fn get_path(
     State(state): State<Arc<AppState>>,
     Path(slug): Path<String>,
 ) -> Result<Json<PathWithSteps>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Fetch the path
     let mut rows = conn
@@ -195,5 +201,8 @@ pub async fn get_path(
         });
     }
 
-    Ok(Json(PathWithSteps { steps, ..path_with_steps }))
+    Ok(Json(PathWithSteps {
+        steps,
+        ..path_with_steps
+    }))
 }

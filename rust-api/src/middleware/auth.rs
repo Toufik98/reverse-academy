@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use axum::{
     extract::{Request, State},
     http::{header, StatusCode},
@@ -13,7 +14,7 @@ use crate::AppState;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    pub sub: String,       // user_id
+    pub sub: String, // user_id
     pub email: String,
     pub exp: usize,
     pub iat: usize,
@@ -79,12 +80,17 @@ pub async fn require_auth(
             )
         })?;
 
-    if rows.next().await.map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": "Database error" })),
-        )
-    })?.is_none() {
+    if rows
+        .next()
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Database error" })),
+            )
+        })?
+        .is_none()
+    {
         return Err((
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({ "error": "User not found or account deleted" })),

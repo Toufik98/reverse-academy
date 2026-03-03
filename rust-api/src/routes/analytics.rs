@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
 
-use crate::AppState;
 use crate::error::AppError;
+use crate::AppState;
 
 /// Analytics event payload for POST /analytics/event
 #[derive(Debug, Deserialize, ToSchema)]
@@ -175,8 +175,7 @@ pub async fn user_summary(
     let mut recent_stream = recent_rows;
     while let Ok(Some(r)) = recent_stream.next().await {
         let metadata_str: Option<String> = r.get(2).ok();
-        let metadata = metadata_str
-            .and_then(|s| serde_json::from_str(&s).ok());
+        let metadata = metadata_str.and_then(|s| serde_json::from_str(&s).ok());
 
         recent_events.push(AnalyticsEvent {
             id: r.get::<String>(0).unwrap_or_default(),

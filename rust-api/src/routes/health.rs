@@ -33,16 +33,18 @@ pub struct PistonHealth {
         (status = 200, description = "Service health status", body = HealthResponse)
     )
 )]
-pub async fn health_check(
-    State(state): State<Arc<AppState>>,
-) -> Json<HealthResponse> {
+pub async fn health_check(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
     let start = std::time::Instant::now();
     let conn = state.db.connect().unwrap();
     let db_healthy = conn.query("SELECT 1", ()).await.is_ok();
     let latency = start.elapsed().as_millis() as u64;
 
     Json(HealthResponse {
-        status: if db_healthy { "healthy".into() } else { "degraded".into() },
+        status: if db_healthy {
+            "healthy".into()
+        } else {
+            "degraded".into()
+        },
         db: DbHealth {
             healthy: db_healthy,
             latency_ms: latency,
@@ -60,9 +62,7 @@ pub async fn health_check(
         (status = 200, description = "Piston sidecar health", body = PistonHealth)
     )
 )]
-pub async fn piston_health(
-    State(state): State<Arc<AppState>>,
-) -> Json<PistonHealth> {
+pub async fn piston_health(State(state): State<Arc<AppState>>) -> Json<PistonHealth> {
     let reachable = state
         .http_client
         .get(format!("{}/runtimes", state.config.piston_url))
@@ -73,7 +73,11 @@ pub async fn piston_health(
         .unwrap_or(false);
 
     Json(PistonHealth {
-        status: if reachable { "healthy".into() } else { "unreachable".into() },
+        status: if reachable {
+            "healthy".into()
+        } else {
+            "unreachable".into()
+        },
         reachable,
     })
 }

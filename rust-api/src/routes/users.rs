@@ -57,7 +57,10 @@ pub async fn get_preferences(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,
 ) -> Result<Json<UserPreferences>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut rows = conn
         .query(
@@ -106,7 +109,10 @@ pub async fn update_preferences(
     Path(user_id): Path<String>,
     Json(req): Json<UpdatePreferencesRequest>,
 ) -> Result<Json<MessageResponse>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Upsert — try insert then update on conflict
     conn.execute(
@@ -152,7 +158,10 @@ pub async fn export_data(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,
 ) -> Result<Json<UserExport>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Fetch preferences
     let prefs = get_preferences(State(state.clone()), Path(user_id.clone()))
@@ -217,7 +226,10 @@ pub async fn delete_user(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,
 ) -> Result<Json<MessageResponse>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Soft delete: set deleted_at, actual deletion happens via cron after 7 days
     conn.execute(

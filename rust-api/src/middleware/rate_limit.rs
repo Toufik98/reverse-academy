@@ -1,10 +1,5 @@
-use axum::{
-    extract::Request,
-    http::StatusCode,
-    middleware::Next,
-    response::Response,
-    Json,
-};
+#![allow(dead_code)]
+use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response, Json};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -51,7 +46,10 @@ impl RateLimiter {
             Ok(*tokens)
         } else {
             let elapsed = now.duration_since(*last_refill);
-            let retry_after = self.refill_interval.as_secs().saturating_sub(elapsed.as_secs());
+            let retry_after = self
+                .refill_interval
+                .as_secs()
+                .saturating_sub(elapsed.as_secs());
             Err(retry_after.max(1))
         }
     }

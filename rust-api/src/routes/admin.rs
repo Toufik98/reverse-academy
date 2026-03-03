@@ -154,31 +154,49 @@ pub async fn admin_stats(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<AdminStatsResponse>, AppError> {
     verify_admin(&headers, &state.config)?;
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let total_paths: i32 = conn
         .query("SELECT COUNT(*) FROM learning_paths", ())
         .await?
-        .next().await?.unwrap().get(0)?;
+        .next()
+        .await?
+        .unwrap()
+        .get(0)?;
 
     let total_steps: i32 = conn
         .query("SELECT COUNT(*) FROM steps", ())
         .await?
-        .next().await?.unwrap().get(0)?;
+        .next()
+        .await?
+        .unwrap()
+        .get(0)?;
 
     let total_users: i32 = conn
         .query("SELECT COUNT(*) FROM users WHERE deleted_at IS NULL", ())
         .await?
-        .next().await?.unwrap().get(0)?;
+        .next()
+        .await?
+        .unwrap()
+        .get(0)?;
 
     let total_achievements: i32 = conn
         .query("SELECT COUNT(*) FROM achievements", ())
         .await?
-        .next().await?.unwrap().get(0)?;
+        .next()
+        .await?
+        .unwrap()
+        .get(0)?;
 
     // Paths by domain
     let mut domain_rows = conn
-        .query("SELECT domain, COUNT(*) as cnt FROM learning_paths GROUP BY domain ORDER BY cnt DESC", ())
+        .query(
+            "SELECT domain, COUNT(*) as cnt FROM learning_paths GROUP BY domain ORDER BY cnt DESC",
+            (),
+        )
         .await?;
     let mut paths_by_domain = Vec::new();
     while let Some(row) = domain_rows.next().await? {
@@ -230,7 +248,10 @@ pub async fn create_path(
     Json(req): Json<CreatePathRequest>,
 ) -> Result<(StatusCode, Json<AdminMessage>), AppError> {
     verify_admin(&headers, &state.config)?;
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let id = req.slug.clone();
 
@@ -257,7 +278,13 @@ pub async fn create_path(
     })?;
 
     tracing::info!(slug = %req.slug, "Admin created path");
-    Ok((StatusCode::CREATED, Json(AdminMessage { message: "Path created".into(), id: Some(id) })))
+    Ok((
+        StatusCode::CREATED,
+        Json(AdminMessage {
+            message: "Path created".into(),
+            id: Some(id),
+        }),
+    ))
 }
 
 /// PUT /api/v1/admin/paths/:id — Update a learning path
@@ -280,7 +307,10 @@ pub async fn update_path(
     Json(req): Json<UpdatePathRequest>,
 ) -> Result<Json<AdminMessage>, AppError> {
     verify_admin(&headers, &state.config)?;
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Build dynamic UPDATE
     let mut sets = Vec::new();
@@ -315,10 +345,13 @@ pub async fn update_path(
     push_int_field!(req.xp_reward, "xp_reward");
 
     if sets.is_empty() {
-        return Ok(Json(AdminMessage { message: "No fields to update".into(), id: None }));
+        return Ok(Json(AdminMessage {
+            message: "No fields to update".into(),
+            id: None,
+        }));
     }
 
-    sets.push(format!("updated_at = datetime('now')"));
+    sets.push("updated_at = datetime('now')".to_string());
     values.push(libsql::Value::Text(id.clone()));
 
     let sql = format!(
@@ -333,7 +366,10 @@ pub async fn update_path(
     }
 
     tracing::info!(id = %id, "Admin updated path");
-    Ok(Json(AdminMessage { message: "Path updated".into(), id: Some(id) }))
+    Ok(Json(AdminMessage {
+        message: "Path updated".into(),
+        id: Some(id),
+    }))
 }
 
 /// DELETE /api/v1/admin/paths/:id — Delete a learning path and all its steps
@@ -354,7 +390,10 @@ pub async fn delete_path(
     Path(id): Path<String>,
 ) -> Result<Json<AdminMessage>, AppError> {
     verify_admin(&headers, &state.config)?;
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Steps cascade-delete via FK
     let affected = conn
@@ -366,7 +405,10 @@ pub async fn delete_path(
     }
 
     tracing::info!(id = %id, "Admin deleted path");
-    Ok(Json(AdminMessage { message: "Path deleted".into(), id: Some(id) }))
+    Ok(Json(AdminMessage {
+        message: "Path deleted".into(),
+        id: Some(id),
+    }))
 }
 
 // ─── Step CRUD ───────────────────────────────────────────────────────────────
@@ -391,12 +433,22 @@ pub async fn create_step(
     Json(req): Json<CreateStepRequest>,
 ) -> Result<(StatusCode, Json<AdminMessage>), AppError> {
     verify_admin(&headers, &state.config)?;
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Verify path exists
     let exists: i32 = conn
-        .query("SELECT COUNT(*) FROM learning_paths WHERE id = ?1", [path_id.as_str()])
-        .await?.next().await?.unwrap().get(0)?;
+        .query(
+            "SELECT COUNT(*) FROM learning_paths WHERE id = ?1",
+            [path_id.as_str()],
+        )
+        .await?
+        .next()
+        .await?
+        .unwrap()
+        .get(0)?;
     if exists == 0 {
         return Err(AppError::NotFound("Path not found".into()));
     }
@@ -411,8 +463,15 @@ pub async fn create_step(
         o
     } else {
         let max_order: i32 = conn
-            .query("SELECT COALESCE(MAX(order_index), 0) FROM steps WHERE path_id = ?1", [path_id.as_str()])
-            .await?.next().await?.unwrap().get(0)?;
+            .query(
+                "SELECT COALESCE(MAX(order_index), 0) FROM steps WHERE path_id = ?1",
+                [path_id.as_str()],
+            )
+            .await?
+            .next()
+            .await?
+            .unwrap()
+            .get(0)?;
         max_order + 1
     };
 
@@ -436,7 +495,13 @@ pub async fn create_step(
     ).await?;
 
     tracing::info!(path_id = %path_id, step_id = %step_id, "Admin created step");
-    Ok((StatusCode::CREATED, Json(AdminMessage { message: "Step created".into(), id: Some(step_id) })))
+    Ok((
+        StatusCode::CREATED,
+        Json(AdminMessage {
+            message: "Step created".into(),
+            id: Some(step_id),
+        }),
+    ))
 }
 
 /// PUT /api/v1/admin/paths/:path_id/steps/:step_id — Update a step
@@ -462,7 +527,10 @@ pub async fn update_step(
     Json(req): Json<UpdateStepRequest>,
 ) -> Result<Json<AdminMessage>, AppError> {
     verify_admin(&headers, &state.config)?;
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let full_step_id = format!("{}/{}", path_id, step_id);
 
@@ -499,17 +567,16 @@ pub async fn update_step(
     }
 
     if sets.is_empty() {
-        return Ok(Json(AdminMessage { message: "No fields to update".into(), id: None }));
+        return Ok(Json(AdminMessage {
+            message: "No fields to update".into(),
+            id: None,
+        }));
     }
 
-    sets.push(format!("updated_at = datetime('now')"));
+    sets.push("updated_at = datetime('now')".to_string());
     values.push(libsql::Value::Text(full_step_id.clone()));
 
-    let sql = format!(
-        "UPDATE steps SET {} WHERE id = ?{}",
-        sets.join(", "),
-        idx
-    );
+    let sql = format!("UPDATE steps SET {} WHERE id = ?{}", sets.join(", "), idx);
 
     let affected = conn.execute(&sql, values).await?;
     if affected == 0 {
@@ -517,7 +584,10 @@ pub async fn update_step(
     }
 
     tracing::info!(step_id = %full_step_id, "Admin updated step");
-    Ok(Json(AdminMessage { message: "Step updated".into(), id: Some(full_step_id) }))
+    Ok(Json(AdminMessage {
+        message: "Step updated".into(),
+        id: Some(full_step_id),
+    }))
 }
 
 /// DELETE /api/v1/admin/paths/:path_id/steps/:step_id — Delete a step
@@ -541,29 +611,40 @@ pub async fn delete_step(
     Path((path_id, step_id)): Path<(String, String)>,
 ) -> Result<Json<AdminMessage>, AppError> {
     verify_admin(&headers, &state.config)?;
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let full_step_id = format!("{}/{}", path_id, step_id);
 
     // Get the order_index first for reordering
     let mut rows = conn
-        .query("SELECT order_index FROM steps WHERE id = ?1", [full_step_id.as_str()])
+        .query(
+            "SELECT order_index FROM steps WHERE id = ?1",
+            [full_step_id.as_str()],
+        )
         .await?;
     let order_index: i32 = match rows.next().await? {
         Some(row) => row.get(0)?,
         None => return Err(AppError::NotFound("Step not found".into())),
     };
 
-    conn.execute("DELETE FROM steps WHERE id = ?1", [full_step_id.as_str()]).await?;
+    conn.execute("DELETE FROM steps WHERE id = ?1", [full_step_id.as_str()])
+        .await?;
 
     // Reorder remaining steps
     conn.execute(
         "UPDATE steps SET order_index = order_index - 1 WHERE path_id = ?1 AND order_index > ?2",
         libsql::params![path_id.as_str(), order_index],
-    ).await?;
+    )
+    .await?;
 
     tracing::info!(step_id = %full_step_id, "Admin deleted step");
-    Ok(Json(AdminMessage { message: "Step deleted".into(), id: Some(full_step_id) }))
+    Ok(Json(AdminMessage {
+        message: "Step deleted".into(),
+        id: Some(full_step_id),
+    }))
 }
 
 /// POST /api/v1/admin/paths/:path_id/steps/reorder — Reorder steps
@@ -585,7 +666,10 @@ pub async fn reorder_steps(
     Json(req): Json<ReorderRequest>,
 ) -> Result<Json<AdminMessage>, AppError> {
     verify_admin(&headers, &state.config)?;
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     for (i, step_id) in req.step_ids.iter().enumerate() {
         let full_id = if step_id.contains('/') {
@@ -596,11 +680,15 @@ pub async fn reorder_steps(
         conn.execute(
             "UPDATE steps SET order_index = ?1, updated_at = datetime('now') WHERE id = ?2",
             libsql::params![i as i32 + 1, full_id.as_str()],
-        ).await?;
+        )
+        .await?;
     }
 
     tracing::info!(path_id = %path_id, "Admin reordered steps");
-    Ok(Json(AdminMessage { message: "Steps reordered".into(), id: None }))
+    Ok(Json(AdminMessage {
+        message: "Steps reordered".into(),
+        id: None,
+    }))
 }
 
 // ─── Import / Export ─────────────────────────────────────────────────────────
@@ -623,10 +711,17 @@ pub async fn import_path(
     Json(req): Json<ImportPathRequest>,
 ) -> Result<(StatusCode, Json<AdminMessage>), AppError> {
     verify_admin(&headers, &state.config)?;
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Delete existing path+steps if same slug (upsert behavior)
-    conn.execute("DELETE FROM learning_paths WHERE slug = ?1", [req.slug.as_str()]).await?;
+    conn.execute(
+        "DELETE FROM learning_paths WHERE slug = ?1",
+        [req.slug.as_str()],
+    )
+    .await?;
 
     // Insert path
     conn.execute(
@@ -643,7 +738,7 @@ pub async fn import_path(
             req.estimated_minutes,
             req.xp_reward,
         ],
-    ).await.map_err(|e| AppError::Database(e))?;
+    ).await.map_err(AppError::Database)?;
 
     // Insert steps
     for step in &req.steps {
@@ -653,7 +748,10 @@ pub async fn import_path(
 
         // Extract hint from content if not at top level
         let hint = step.hint.clone().or_else(|| {
-            step.content.get("hint").and_then(|h| h.as_str()).map(|s| s.to_string())
+            step.content
+                .get("hint")
+                .and_then(|h| h.as_str())
+                .map(|s| s.to_string())
         });
 
         conn.execute(
@@ -669,14 +767,17 @@ pub async fn import_path(
                 hint.as_deref().unwrap_or(""),
                 step.xp_reward,
             ],
-        ).await.map_err(|e| AppError::Database(e))?;
+        ).await.map_err(AppError::Database)?;
     }
 
     tracing::info!(slug = %req.slug, steps = req.steps.len(), "Admin imported path");
-    Ok((StatusCode::CREATED, Json(AdminMessage {
-        message: format!("Path imported with {} steps", req.steps.len()),
-        id: Some(req.id),
-    })))
+    Ok((
+        StatusCode::CREATED,
+        Json(AdminMessage {
+            message: format!("Path imported with {} steps", req.steps.len()),
+            id: Some(req.id),
+        }),
+    ))
 }
 
 /// GET /api/v1/admin/paths/:id/export — Export a path as JSON (for backup/transfer)
@@ -697,7 +798,10 @@ pub async fn export_path(
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     verify_admin(&headers, &state.config)?;
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Fetch path
     let mut rows = conn
@@ -708,7 +812,10 @@ pub async fn export_path(
         )
         .await?;
 
-    let row = rows.next().await?.ok_or_else(|| AppError::NotFound("Path not found".into()))?;
+    let row = rows
+        .next()
+        .await?
+        .ok_or_else(|| AppError::NotFound("Path not found".into()))?;
 
     let path_id: String = row.get(0)?;
     let slug: String = row.get(1)?;
@@ -754,7 +861,10 @@ pub async fn export_path(
         });
 
         if !hint.is_empty() {
-            step_json.as_object_mut().unwrap().insert("hint".into(), serde_json::json!(hint));
+            step_json
+                .as_object_mut()
+                .unwrap()
+                .insert("hint".into(), serde_json::json!(hint));
         }
 
         steps.push(step_json);

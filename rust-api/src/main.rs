@@ -1,9 +1,9 @@
 use axum::{
-    routing::{get, post, patch, delete},
+    routing::{delete, get, patch, post},
     Router,
 };
 use std::sync::Arc;
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
@@ -137,8 +137,10 @@ pub struct AppState {
 async fn main() {
     // Initialize tracing
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "reverse_academy_api=info,tower_http=info".into()))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "reverse_academy_api=info,tower_http=info".into()),
+        )
         .with(tracing_subscriber::fmt::layer().json())
         .init();
 
@@ -156,13 +158,10 @@ async fn main() {
             .await
             .expect("Failed to open local database")
     } else {
-        libsql::Builder::new_remote(
-            config.turso_url.clone(),
-            config.turso_auth_token.clone(),
-        )
-        .build()
-        .await
-        .expect("Failed to connect to Turso")
+        libsql::Builder::new_remote(config.turso_url.clone(), config.turso_auth_token.clone())
+            .build()
+            .await
+            .expect("Failed to connect to Turso")
     };
 
     // Run migrations
@@ -184,28 +183,47 @@ async fn main() {
         .route("/verify-email/:token", get(routes::auth::verify_email))
         .route("/github", get(routes::auth::github_auth))
         .route("/github/callback", get(routes::auth::github_callback))
-        .layer(axum::middleware::from_fn(middleware::rate_limit::rate_limit_auth));
+        .layer(axum::middleware::from_fn(
+            middleware::rate_limit::rate_limit_auth,
+        ));
 
     // Execute routes (rate limited: 20/min/user)
     let execute_routes = Router::new()
         .route("/", post(routes::execute::execute_code))
-        .layer(axum::middleware::from_fn(middleware::rate_limit::rate_limit_execute));
+        .layer(axum::middleware::from_fn(
+            middleware::rate_limit::rate_limit_execute,
+        ));
 
     // Protected routes (require auth)
     let progress_routes = Router::new()
         .route("/:user_id", get(routes::progress::get_all_progress))
-        .route("/:user_id/path/:path_id", get(routes::progress::get_path_progress))
-        .route("/:user_id/step/:step_id", post(routes::progress::submit_step))
-        .route("/:user_id/step/:step_id", patch(routes::progress::update_step));
+        .route(
+            "/:user_id/path/:path_id",
+            get(routes::progress::get_path_progress),
+        )
+        .route(
+            "/:user_id/step/:step_id",
+            post(routes::progress::submit_step),
+        )
+        .route(
+            "/:user_id/step/:step_id",
+            patch(routes::progress::update_step),
+        );
 
     let achievement_routes = Router::new()
         .route("/", get(routes::achievements::list_all))
         .route("/:user_id", get(routes::achievements::user_achievements))
-        .route("/:user_id/check", post(routes::achievements::check_achievements));
+        .route(
+            "/:user_id/check",
+            post(routes::achievements::check_achievements),
+        );
 
     let user_routes = Router::new()
         .route("/:user_id/preferences", get(routes::users::get_preferences))
-        .route("/:user_id/preferences", patch(routes::users::update_preferences))
+        .route(
+            "/:user_id/preferences",
+            patch(routes::users::update_preferences),
+        )
         .route("/:user_id/export", post(routes::users::export_data))
         .route("/:user_id", delete(routes::users::delete_user));
 
@@ -221,9 +239,18 @@ async fn main() {
         .route("/paths/:id", axum::routing::put(routes::admin::update_path))
         .route("/paths/:id", delete(routes::admin::delete_path))
         .route("/paths/:path_id/steps", post(routes::admin::create_step))
-        .route("/paths/:path_id/steps/:step_id", axum::routing::put(routes::admin::update_step))
-        .route("/paths/:path_id/steps/:step_id", delete(routes::admin::delete_step))
-        .route("/paths/:path_id/steps/reorder", post(routes::admin::reorder_steps))
+        .route(
+            "/paths/:path_id/steps/:step_id",
+            axum::routing::put(routes::admin::update_step),
+        )
+        .route(
+            "/paths/:path_id/steps/:step_id",
+            delete(routes::admin::delete_step),
+        )
+        .route(
+            "/paths/:path_id/steps/reorder",
+            post(routes::admin::reorder_steps),
+        )
         .route("/import", post(routes::admin::import_path))
         .route("/paths/:id/export", get(routes::admin::export_path));
 
@@ -249,7 +276,9 @@ async fn main() {
         .nest("/api/v1/admin", admin_routes)
         .nest("/api/v1/analytics", analytics_routes)
         // Global layers
-        .layer(axum::middleware::from_fn(middleware::rate_limit::rate_limit_general))
+        .layer(axum::middleware::from_fn(
+            middleware::rate_limit::rate_limit_general,
+        ))
         .layer(TraceLayer::new_for_http())
         .layer(
             CorsLayer::new()
@@ -265,9 +294,7 @@ async fn main() {
         .await
         .expect("Failed to bind");
 
-    axum::serve(listener, app)
-        .await
-        .expect("Server error");
+    axum::serve(listener, app).await.expect("Server error");
 }
 
 /// Run SQL migration files in order.

@@ -43,10 +43,16 @@ pub struct CheckResult {
 pub async fn list_all(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<AchievementEntry>>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut rows = conn
-        .query("SELECT id, slug, title, description, icon, xp_reward, criteria_json FROM achievements", ())
+        .query(
+            "SELECT id, slug, title, description, icon, xp_reward, criteria_json FROM achievements",
+            (),
+        )
         .await?;
 
     let mut entries = Vec::new();
@@ -79,7 +85,10 @@ pub async fn user_achievements(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,
 ) -> Result<Json<Vec<UserAchievementEntry>>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut rows = conn
         .query(
@@ -124,7 +133,10 @@ pub async fn check_achievements(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,
 ) -> Result<Json<CheckResult>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Fetch all achievements not yet earned by user
     let mut rows = conn
@@ -180,11 +192,7 @@ pub async fn check_achievements(
 
 /// Evaluate achievement criteria against user progress.
 /// Returns true if the user meets the criteria.
-async fn evaluate_criteria(
-    conn: &libsql::Connection,
-    user_id: &str,
-    criteria_json: &str,
-) -> bool {
+async fn evaluate_criteria(conn: &libsql::Connection, user_id: &str, criteria_json: &str) -> bool {
     // Parse criteria
     let criteria: serde_json::Value = match serde_json::from_str(criteria_json) {
         Ok(v) => v,
@@ -195,7 +203,10 @@ async fn evaluate_criteria(
 
     match criteria_type {
         "step_count" => {
-            let _step_type = criteria.get("stepType").and_then(|v| v.as_str()).unwrap_or("");
+            let _step_type = criteria
+                .get("stepType")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let count = criteria.get("count").and_then(|v| v.as_i64()).unwrap_or(1);
 
             // Count completed steps of given type

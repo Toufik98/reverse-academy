@@ -130,7 +130,10 @@ async fn execute_locally(req: &ExecuteRequest) -> Result<ExecuteResponse, AppErr
     }
 }
 
-async fn execute_rust_locally(code: &str, timeout: Option<u32>) -> Result<ExecuteResponse, AppError> {
+async fn execute_rust_locally(
+    code: &str,
+    timeout: Option<u32>,
+) -> Result<ExecuteResponse, AppError> {
     let dir = tempfile::tempdir()
         .map_err(|e| AppError::Internal(format!("Failed to create temp dir: {}", e)))?;
     let src_path = dir.path().join("main.rs");
@@ -232,7 +235,10 @@ async fn execute_go_locally(code: &str, timeout: Option<u32>) -> Result<ExecuteR
     })
 }
 
-async fn execute_python_locally(code: &str, timeout: Option<u32>) -> Result<ExecuteResponse, AppError> {
+async fn execute_python_locally(
+    code: &str,
+    timeout: Option<u32>,
+) -> Result<ExecuteResponse, AppError> {
     let dir = tempfile::tempdir()
         .map_err(|e| AppError::Internal(format!("Failed to create temp dir: {}", e)))?;
     let src_path = dir.path().join("main.py");

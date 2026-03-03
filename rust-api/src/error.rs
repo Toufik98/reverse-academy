@@ -55,15 +55,24 @@ impl IntoResponse for AppError {
             AppError::ServiceUnavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg.clone()),
             AppError::Internal(msg) => {
                 tracing::error!("Internal error: {}", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
             AppError::Database(e) => {
                 tracing::error!("Database error: {}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Database error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Database error".to_string(),
+                )
             }
             AppError::HttpClient(e) => {
                 tracing::error!("HTTP client error: {}", e);
-                (StatusCode::BAD_GATEWAY, "Upstream service error".to_string())
+                (
+                    StatusCode::BAD_GATEWAY,
+                    "Upstream service error".to_string(),
+                )
             }
             AppError::Json(e) => {
                 tracing::error!("JSON error: {}", e);

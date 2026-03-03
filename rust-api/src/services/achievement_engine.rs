@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::sync::Arc;
 
 use crate::{error::AppError, models::achievement::AchievementCriteria, AppState};
@@ -8,7 +9,10 @@ pub async fn check_and_award(
     state: &Arc<AppState>,
     user_id: &str,
 ) -> Result<Vec<String>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Get all achievements the user hasn't earned yet
     let mut rows = conn
@@ -88,7 +92,10 @@ async fn evaluate_criteria(
     user_id: &str,
     criteria: &AchievementCriteria,
 ) -> Result<bool, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     match criteria {
         AchievementCriteria::StepCount { count } => {
@@ -210,7 +217,10 @@ async fn evaluate_criteria(
 
 /// Get total XP for a user.
 async fn get_user_xp(state: &Arc<AppState>, user_id: &str) -> Result<i32, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut rows = conn
         .query("SELECT xp FROM users WHERE id = ?1", [user_id])

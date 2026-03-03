@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::sync::Arc;
 
 use crate::{error::AppError, models::progress::PathProgressSummary, AppState};
@@ -9,7 +10,13 @@ use crate::{error::AppError, models::progress::PathProgressSummary, AppState};
 /// - first_attempt: 2x multiplier
 /// - no_hints: 1.5x multiplier
 /// - speed_bonus: 1.3x multiplier (completed under target time)
-pub fn calculate_step_xp(base_xp: i32, attempts: i32, hints_used: bool, seconds_taken: Option<i32>, target_seconds: Option<i32>) -> i32 {
+pub fn calculate_step_xp(
+    base_xp: i32,
+    attempts: i32,
+    hints_used: bool,
+    seconds_taken: Option<i32>,
+    target_seconds: Option<i32>,
+) -> i32 {
     let mut xp = base_xp as f64;
 
     // First attempt bonus (2x)
@@ -44,14 +51,14 @@ pub async fn get_path_summary(
     user_id: &str,
     path_id: &str,
 ) -> Result<PathProgressSummary, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Count total steps
     let mut total_rows = conn
-        .query(
-            "SELECT COUNT(*) FROM steps WHERE path_id = ?1",
-            [path_id],
-        )
+        .query("SELECT COUNT(*) FROM steps WHERE path_id = ?1", [path_id])
         .await?;
     let total_steps = if let Some(row) = total_rows.next().await? {
         row.get::<i32>(0)?
@@ -114,7 +121,10 @@ pub async fn unlock_next_step(
     path_id: &str,
     completed_step_id: &str,
 ) -> Result<Option<String>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Get the order_index of the completed step
     let mut order_rows = conn

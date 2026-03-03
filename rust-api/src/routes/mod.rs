@@ -1,3 +1,4 @@
+pub mod achievements;
 pub mod admin;
 pub mod analytics;
 pub mod auth;
@@ -5,5 +6,4 @@ pub mod execute;
 pub mod health;
 pub mod paths;
 pub mod progress;
-pub mod achievements;
 pub mod users;

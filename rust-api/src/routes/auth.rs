@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use axum::{
     extract::{Path, Query, State},
     Json,
@@ -57,7 +58,10 @@ pub async fn verify_session(
     State(state): State<Arc<AppState>>,
     Json(req): Json<VerifyRequest>,
 ) -> Result<Json<VerifyResponse>, AppError> {
-    let conn = state.db.connect().map_err(|e| AppError::Internal(e.to_string()))?;
+    let conn = state
+        .db
+        .connect()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut rows = conn
         .query(
@@ -160,7 +164,9 @@ pub async fn github_auth(
 ) -> Result<axum::response::Redirect, AppError> {
     let client_id = &state.config.github_client_id;
     if client_id.is_empty() {
-        return Err(AppError::ServiceUnavailable("GitHub OAuth not configured".to_string()));
+        return Err(AppError::ServiceUnavailable(
+            "GitHub OAuth not configured".to_string(),
+        ));
     }
 
     let redirect_url = format!(

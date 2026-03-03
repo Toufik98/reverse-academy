@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -36,7 +37,7 @@ pub struct CreateUserRequest {
 
 #[derive(Debug, Serialize)]
 pub struct SessionClaims {
-    pub sub: String,       // user_id
+    pub sub: String, // user_id
     pub email: String,
     pub username: String,
     pub exp: usize,
