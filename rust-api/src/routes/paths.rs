@@ -96,7 +96,7 @@ pub async fn list_paths(
         // Strip the "pathId/" prefix from compound step IDs
         let path_id: String = row.get(0)?;
         let first_step_id = first_step_raw.map(|fid| {
-            fid.strip_prefix(&format!("{}/", path_id))
+            fid.strip_prefix(&format!("{path_id}/"))
                 .unwrap_or(&fid)
                 .to_string()
         });
@@ -182,7 +182,7 @@ pub async fn get_path(
         let raw_id: String = sr.get(0)?;
         // Strip "pathId/" prefix from the compound step ID to return just "step-N"
         let short_id = raw_id
-            .strip_prefix(&format!("{}/", path_id))
+            .strip_prefix(&format!("{path_id}/"))
             .unwrap_or(&raw_id)
             .to_string();
 

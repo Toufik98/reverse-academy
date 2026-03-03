@@ -198,12 +198,12 @@ async fn execute_rust_locally(
 
 async fn execute_go_locally(code: &str, timeout: Option<u32>) -> Result<ExecuteResponse, AppError> {
     let dir = tempfile::tempdir()
-        .map_err(|e| AppError::Internal(format!("Failed to create temp dir: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to create temp dir: {e}")))?;
     let src_path = dir.path().join("main.go");
 
     tokio::fs::write(&src_path, code)
         .await
-        .map_err(|e| AppError::Internal(format!("Failed to write source: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to write source: {e}")))?;
 
     let timeout_ms = timeout.unwrap_or(10000) as u64;
 
@@ -217,7 +217,7 @@ async fn execute_go_locally(code: &str, timeout: Option<u32>) -> Result<ExecuteR
     )
     .await
     .map_err(|_| AppError::ServiceUnavailable("Go execution timed out".to_string()))?
-    .map_err(|e| AppError::ServiceUnavailable(format!("go not found: {}", e)))?;
+    .map_err(|e| AppError::ServiceUnavailable(format!("go not found: {e}")))?;
 
     let elapsed = start.elapsed().as_millis() as u32;
     let stdout = String::from_utf8_lossy(&run_result.stdout).to_string();
@@ -240,12 +240,12 @@ async fn execute_python_locally(
     timeout: Option<u32>,
 ) -> Result<ExecuteResponse, AppError> {
     let dir = tempfile::tempdir()
-        .map_err(|e| AppError::Internal(format!("Failed to create temp dir: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to create temp dir: {e}")))?;
     let src_path = dir.path().join("main.py");
 
     tokio::fs::write(&src_path, code)
         .await
-        .map_err(|e| AppError::Internal(format!("Failed to write source: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to write source: {e}")))?;
 
     let timeout_ms = timeout.unwrap_or(10000) as u64;
 
@@ -258,7 +258,7 @@ async fn execute_python_locally(
     )
     .await
     .map_err(|_| AppError::ServiceUnavailable("Python execution timed out".to_string()))?
-    .map_err(|e| AppError::ServiceUnavailable(format!("python3 not found: {}", e)))?;
+    .map_err(|e| AppError::ServiceUnavailable(format!("python3 not found: {e}")))?;
 
     let elapsed = start.elapsed().as_millis() as u32;
     let stdout = String::from_utf8_lossy(&run_result.stdout).to_string();
