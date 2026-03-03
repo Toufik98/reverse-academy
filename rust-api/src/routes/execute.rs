@@ -83,14 +83,13 @@ async fn execute_via_piston(
         }))
         .send()
         .await
-        .map_err(|e| AppError::ServiceUnavailable(format!("Piston unreachable: {}", e)))?;
+        .map_err(|e| AppError::ServiceUnavailable(format!("Piston unreachable: {e}")))?;
 
     if !piston_response.status().is_success() {
         let status = piston_response.status();
         let body = piston_response.text().await.unwrap_or_default();
         return Err(AppError::ServiceUnavailable(format!(
-            "Piston returned {}: {}",
-            status, body
+            "Piston returned {status}: {body}"
         )));
     }
 
@@ -123,9 +122,8 @@ async fn execute_locally(req: &ExecuteRequest) -> Result<ExecuteResponse, AppErr
         "go" => execute_go_locally(&req.code, req.timeout).await,
         "python" | "python3" => execute_python_locally(&req.code, req.timeout).await,
         other => Err(AppError::ServiceUnavailable(format!(
-            "No local executor for '{}' and Piston is unreachable. \
-             Install Docker and run Piston, or use a browser-tier language.",
-            other
+            "No local executor for '{other}' and Piston is unreachable. \
+             Install Docker and run Piston, or use a browser-tier language."
         ))),
     }
 }
@@ -135,13 +133,13 @@ async fn execute_rust_locally(
     timeout: Option<u32>,
 ) -> Result<ExecuteResponse, AppError> {
     let dir = tempfile::tempdir()
-        .map_err(|e| AppError::Internal(format!("Failed to create temp dir: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to create temp dir: {e}")))?;
     let src_path = dir.path().join("main.rs");
     let bin_path = dir.path().join("main");
 
     tokio::fs::write(&src_path, code)
         .await
-        .map_err(|e| AppError::Internal(format!("Failed to write source: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to write source: {e}")))?;
 
     let timeout_ms = timeout.unwrap_or(10000) as u64;
 
@@ -158,7 +156,7 @@ async fn execute_rust_locally(
     )
     .await
     .map_err(|_| AppError::ServiceUnavailable("Rust compilation timed out".to_string()))?
-    .map_err(|e| AppError::ServiceUnavailable(format!("rustc not found: {}", e)))?;
+    .map_err(|e| AppError::ServiceUnavailable(format!("rustc not found: {e}")))?;
 
     if !compile_result.status.success() {
         let stderr = String::from_utf8_lossy(&compile_result.stderr).to_string();
@@ -178,7 +176,7 @@ async fn execute_rust_locally(
     )
     .await
     .map_err(|_| AppError::ServiceUnavailable("Execution timed out".to_string()))?
-    .map_err(|e| AppError::Internal(format!("Failed to run binary: {}", e)))?;
+    .map_err(|e| AppError::Internal(format!("Failed to run binary: {e}")))?;
 
     let elapsed = start.elapsed().as_millis() as u32;
     let stdout = String::from_utf8_lossy(&run_result.stdout).to_string();

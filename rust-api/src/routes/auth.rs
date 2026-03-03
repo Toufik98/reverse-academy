@@ -169,10 +169,8 @@ pub async fn github_auth(
         ));
     }
 
-    let redirect_url = format!(
-        "https://github.com/login/oauth/authorize?client_id={}&scope=user:email",
-        client_id
-    );
+    let redirect_url =
+        format!("https://github.com/login/oauth/authorize?client_id={client_id}&scope=user:email");
 
     Ok(axum::response::Redirect::temporary(&redirect_url))
 }

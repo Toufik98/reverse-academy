@@ -320,7 +320,7 @@ pub async fn update_path(
     macro_rules! push_field {
         ($field:expr, $col:expr) => {
             if let Some(ref val) = $field {
-                sets.push(format!("{} = ?{}", $col, idx));
+                sets.push(format!("{} = ?{idx}", $col));
                 values.push(libsql::Value::Text(val.clone()));
                 idx += 1;
             }
@@ -329,7 +329,7 @@ pub async fn update_path(
     macro_rules! push_int_field {
         ($field:expr, $col:expr) => {
             if let Some(val) = $field {
-                sets.push(format!("{} = ?{}", $col, idx));
+                sets.push(format!("{} = ?{idx}", $col));
                 values.push(libsql::Value::Integer(val as i64));
                 idx += 1;
             }
@@ -475,9 +475,9 @@ pub async fn create_step(
         max_order + 1
     };
 
-    let step_id = format!("{}/step-{}", path_id, order);
+    let step_id = format!("{path_id}/step-{order}");
     let content_str = serde_json::to_string(&req.content)
-        .map_err(|e| AppError::Internal(format!("JSON error: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("JSON error: {e}")))?;
 
     conn.execute(
         "INSERT INTO steps (id, path_id, order_index, title, step_type, content_json, hint, xp_reward) \
@@ -532,36 +532,36 @@ pub async fn update_step(
         .connect()
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    let full_step_id = format!("{}/{}", path_id, step_id);
+    let full_step_id = format!("{path_id}/{step_id}");
 
     let mut sets = Vec::new();
     let mut values: Vec<libsql::Value> = Vec::new();
     let mut idx = 1;
 
     if let Some(ref title) = req.title {
-        sets.push(format!("title = ?{}", idx));
+        sets.push(format!("title = ?{idx}"));
         values.push(libsql::Value::Text(title.clone()));
         idx += 1;
     }
     if let Some(ref st) = req.step_type {
-        sets.push(format!("step_type = ?{}", idx));
+        sets.push(format!("step_type = ?{idx}"));
         values.push(libsql::Value::Text(st.clone()));
         idx += 1;
     }
     if let Some(ref content) = req.content {
         let s = serde_json::to_string(content)
-            .map_err(|e| AppError::Internal(format!("JSON error: {}", e)))?;
-        sets.push(format!("content_json = ?{}", idx));
+            .map_err(|e| AppError::Internal(format!("JSON error: {e}")))?;
+        sets.push(format!("content_json = ?{idx}"));
         values.push(libsql::Value::Text(s));
         idx += 1;
     }
     if let Some(ref hint) = req.hint {
-        sets.push(format!("hint = ?{}", idx));
+        sets.push(format!("hint = ?{idx}"));
         values.push(libsql::Value::Text(hint.clone()));
         idx += 1;
     }
     if let Some(xp) = req.xp_reward {
-        sets.push(format!("xp_reward = ?{}", idx));
+        sets.push(format!("xp_reward = ?{idx}"));
         values.push(libsql::Value::Integer(xp as i64));
         idx += 1;
     }
@@ -576,7 +576,7 @@ pub async fn update_step(
     sets.push("updated_at = datetime('now')".to_string());
     values.push(libsql::Value::Text(full_step_id.clone()));
 
-    let sql = format!("UPDATE steps SET {} WHERE id = ?{}", sets.join(", "), idx);
+    let sql = format!("UPDATE steps SET {} WHERE id = ?{idx}", sets.join(", "));
 
     let affected = conn.execute(&sql, values).await?;
     if affected == 0 {
@@ -616,7 +616,7 @@ pub async fn delete_step(
         .connect()
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    let full_step_id = format!("{}/{}", path_id, step_id);
+    let full_step_id = format!("{path_id}/{step_id}");
 
     // Get the order_index first for reordering
     let mut rows = conn
@@ -675,7 +675,7 @@ pub async fn reorder_steps(
         let full_id = if step_id.contains('/') {
             step_id.clone()
         } else {
-            format!("{}/{}", path_id, step_id)
+            format!("{path_id}/{step_id}")
         };
         conn.execute(
             "UPDATE steps SET order_index = ?1, updated_at = datetime('now') WHERE id = ?2",
@@ -744,7 +744,7 @@ pub async fn import_path(
     for step in &req.steps {
         let step_id = format!("{}/{}", req.id, step.id);
         let content_str = serde_json::to_string(&step.content)
-            .map_err(|e| AppError::Internal(format!("JSON error: {}", e)))?;
+            .map_err(|e| AppError::Internal(format!("JSON error: {e}")))?;
 
         // Extract hint from content if not at top level
         let hint = step.hint.clone().or_else(|| {
@@ -840,7 +840,7 @@ pub async fn export_path(
     while let Some(sr) = step_rows.next().await? {
         let raw_id: String = sr.get(0)?;
         let short_id = raw_id
-            .strip_prefix(&format!("{}/", path_id))
+            .strip_prefix(&format!("{path_id}/"))
             .unwrap_or(&raw_id)
             .to_string();
         let order: i32 = sr.get(1)?;

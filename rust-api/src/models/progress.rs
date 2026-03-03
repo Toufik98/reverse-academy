@@ -44,7 +44,7 @@ impl TryFrom<&str> for ProgressStatus {
             "available" => Ok(ProgressStatus::Available),
             "in_progress" | "in-progress" => Ok(ProgressStatus::InProgress),
             "completed" => Ok(ProgressStatus::Completed),
-            other => Err(format!("Invalid progress status: {}", other)),
+            other => Err(format!("Invalid progress status: {other}")),
         }
     }
 }
