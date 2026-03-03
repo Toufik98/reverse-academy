@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { BACKEND_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 
 /**
@@ -7,7 +7,7 @@ import type { RequestHandler } from './$types';
  * This enables backend-tier code execution (Rust, Go, C++, Java via Piston).
  */
 export const POST: RequestHandler = async ({ request, fetch: _fetch }) => {
-	const backendUrl = BACKEND_URL || 'http://localhost:8080';
+	const backendUrl = env.BACKEND_URL || 'http://localhost:8080';
 
 	try {
 		const body = await request.json();

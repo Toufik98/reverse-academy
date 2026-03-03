@@ -1,9 +1,9 @@
 import type { LearningPath, DomainInfo } from '$types/path';
 import type { Achievement } from '$types/gamification';
 import type { SupportedLocale } from '$types/i18n';
-import { BACKEND_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
-const API_BASE = BACKEND_URL || 'http://localhost:8080';
+const API_BASE = () => env.BACKEND_URL || 'http://localhost:8080';
 
 /**
  * Load a single learning path by slug from the API (source of truth).
@@ -11,7 +11,7 @@ const API_BASE = BACKEND_URL || 'http://localhost:8080';
  */
 export async function loadPath(slug: string, _locale?: SupportedLocale): Promise<LearningPath | null> {
 	try {
-		const res = await fetch(`${API_BASE}/api/v1/paths/${slug}`);
+		const res = await fetch(`${API_BASE()}/api/v1/paths/${slug}`);
 		if (res.ok) {
 			return (await res.json()) as LearningPath;
 		}
@@ -44,7 +44,7 @@ export async function loadPath(slug: string, _locale?: SupportedLocale): Promise
  */
 export async function loadAllPaths(_locale?: SupportedLocale): Promise<LearningPath[]> {
 	try {
-		const res = await fetch(`${API_BASE}/api/v1/paths`);
+		const res = await fetch(`${API_BASE()}/api/v1/paths`);
 		if (res.ok) {
 			return (await res.json()) as LearningPath[];
 		}

@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
-import { BACKEND_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
-const API_BASE = BACKEND_URL ?? 'http://localhost:8080';
+const API_BASE = () => env.BACKEND_URL ?? 'http://localhost:8080';
 
 /**
  * Proxy: GET /api/achievements → Rust API GET /api/v1/achievements
@@ -18,7 +18,7 @@ export const GET: RequestHandler = async ({ url, cookies, fetch: serverFetch }) 
   }
 
   // Forward the full path after /api/achievements
-  const backendUrl = `${API_BASE}/api/v1/achievements${url.search}`;
+  const backendUrl = `${API_BASE()}/api/v1/achievements${url.search}`;
 
   const res = await serverFetch(backendUrl, { headers });
 
@@ -47,7 +47,7 @@ export const POST: RequestHandler = async ({ request, cookies, fetch: serverFetc
   const payload = JSON.parse(body);
   const userId = payload.userId;
 
-  const res = await serverFetch(`${API_BASE}/api/v1/achievements/${userId}/check`, {
+  const res = await serverFetch(`${API_BASE()}/api/v1/achievements/${userId}/check`, {
     method: 'POST',
     headers,
     body,
