@@ -9,13 +9,16 @@
  */
 
 import { readFileSync, readdirSync, existsSync } from 'fs';
-import { join, relative } from 'path';
+import { join, relative, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import {
 	learningPathSchema,
 	domainsSchema,
 	achievementsSchema
 } from '../src/schemas/content';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const CONTENT_DIR = join(__dirname, '..', 'src', 'content');
 const LOCALES = ['en', 'fr'];
 
