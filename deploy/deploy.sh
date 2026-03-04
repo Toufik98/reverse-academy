@@ -30,7 +30,7 @@ fi
 # -- 2. Pull latest images --------------------------
 echo ""
 echo "[2/4] Pulling images (tag: ${TAG})..."
-TAG="${TAG}" docker compose -f "${COMPOSE_FILE}" pull api frontend nginx
+TAG="${TAG}" docker compose -f "${COMPOSE_FILE}" pull api frontend
 echo "  ✓ Images pulled."
 
 # -- 3. Restart containers --------------------------
