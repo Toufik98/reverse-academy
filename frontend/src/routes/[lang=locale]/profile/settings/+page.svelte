@@ -5,7 +5,6 @@
 	import type { PageData } from './$types';
 
 	export let data: PageData;
-	// SvelteKit passes route params internally
 	export let params: Record<string, string> = {};
 
 	const labels = {
@@ -14,10 +13,27 @@
 	};
 
 	$: t = labels[$locale] || labels.en;
+	$: userId = data.userId;
 
-	function handleSave(e: CustomEvent) {
-		// TODO: POST to /api/v1/users/:userId/preferences
-		console.log('Saving preferences:', e.detail);
+	async function handleSave(e: CustomEvent) {
+		const prefs = e.detail;
+		try {
+			const res = await fetch(`/api/users/${userId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					locale: prefs.locale,
+					theme: prefs.theme,
+					editor_font_size: prefs.editorFontSize,
+					editor_tab_size: prefs.editorTabSize
+				})
+			});
+			if (!res.ok) {
+				console.error('Failed to save preferences');
+			}
+		} catch (err) {
+			console.error('Error saving preferences:', err);
+		}
 	}
 </script>
 
@@ -25,7 +41,7 @@
 
 <div class="settings-page">
 	<h1 class="page-title">{t.title}</h1>
-	<SettingsForm />
+	<SettingsForm on:save={handleSave} />
 </div>
 
 <style>

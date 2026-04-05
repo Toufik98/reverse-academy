@@ -150,34 +150,77 @@ pub async fn submit_step(
         .db
         .connect()
         .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    // Fetch the step to get its base XP reward
+    let mut step_rows = conn
+        .query(
+            "SELECT xp_reward FROM steps WHERE id = ?1",
+            [step_id.as_str()],
+        )
+        .await?;
+
+    let base_xp: i32 = if let Some(row) = step_rows.next().await? {
+        row.get(0)?
+    } else {
+        return Err(AppError::NotFound("Step not found".to_string()));
+    };
+
+    // Check if this is the user's first attempt at this step
+    let mut existing = conn
+        .query(
+            "SELECT attempts FROM user_progress WHERE user_id = ?1 AND step_id = ?2 LIMIT 1",
+            [user_id.as_str(), step_id.as_str()],
+        )
+        .await?;
+
+    let attempts = if let Some(row) = existing.next().await? {
+        row.get::<i32>(0)? + 1
+    } else {
+        1
+    };
+
     let id = uuid::Uuid::now_v7().to_string();
 
     conn.execute(
-        "INSERT INTO user_progress (id, user_id, path_id, step_id, status, attempts, answer_json, completed_at) VALUES (?1, ?2, ?3, ?4, 'completed', 1, ?5, datetime('now'))",
+        "INSERT INTO user_progress (id, user_id, path_id, step_id, status, attempts, answer_json, completed_at, last_active_at) VALUES (?1, ?2, ?3, ?4, 'completed', ?5, ?6, datetime('now'), datetime('now')) ON CONFLICT(user_id, step_id) DO UPDATE SET status = 'completed', attempts = ?5, answer_json = ?6, completed_at = datetime('now'), last_active_at = datetime('now')",
         libsql::params![
             id.as_str(),
             user_id.as_str(),
             req.path_id.as_str(),
             step_id.as_str(),
+            attempts,
             req.answer_json.as_deref().unwrap_or("{}"),
         ],
     )
     .await?;
 
-    // TODO: Calculate actual XP based on step, attempts, hints used
-    let xp_earned = 10;
+    // Calculate XP with bonuses per PLAN.md §13
+    let mut multiplier: f64 = 1.0;
+
+    // First attempt success: 2x bonus
+    if attempts == 1 {
+        multiplier *= 2.0;
+    }
+
+    let xp_earned = (base_xp as f64 * multiplier).round() as i32;
 
     // Update user XP
     conn.execute(
-        "UPDATE users SET xp = xp + ?1 WHERE id = ?2",
+        "UPDATE users SET xp = xp + ?1, updated_at = datetime('now') WHERE id = ?2",
         libsql::params![xp_earned, user_id.as_str()],
     )
     .await?;
 
+    let message = if attempts == 1 {
+        "Step completed on first attempt! 2x bonus XP earned".to_string()
+    } else {
+        "Step completed".to_string()
+    };
+
     Ok(Json(SubmitResponse {
         success: true,
         xp_earned,
-        message: "Step completed".to_string(),
+        message,
     }))
 }
 
@@ -208,7 +251,7 @@ pub async fn update_step(
 
     if let Some(attempts) = req.attempts {
         conn.execute(
-            "UPDATE user_progress SET attempts = ?1 WHERE user_id = ?2 AND step_id = ?3",
+            "UPDATE user_progress SET attempts = ?1, last_active_at = datetime('now') WHERE user_id = ?2 AND step_id = ?3",
             libsql::params![attempts, user_id.as_str(), step_id.as_str()],
         )
         .await?;
@@ -216,8 +259,16 @@ pub async fn update_step(
 
     if let Some(status) = &req.status {
         conn.execute(
-            "UPDATE user_progress SET status = ?1 WHERE user_id = ?2 AND step_id = ?3",
+            "UPDATE user_progress SET status = ?1, last_active_at = datetime('now') WHERE user_id = ?2 AND step_id = ?3",
             libsql::params![status.as_str(), user_id.as_str(), step_id.as_str()],
+        )
+        .await?;
+    }
+
+    if let Some(answer_json) = &req.answer_json {
+        conn.execute(
+            "UPDATE user_progress SET answer_json = ?1, last_active_at = datetime('now') WHERE user_id = ?2 AND step_id = ?3",
+            libsql::params![answer_json.as_str(), user_id.as_str(), step_id.as_str()],
         )
         .await?;
     }

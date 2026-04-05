@@ -147,6 +147,34 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     let config = AppConfig::from_env();
+
+    // Initialize Sentry if DSN is configured
+    let _sentry_guard = std::env::var("SENTRY_DSN")
+        .ok()
+        .map(|dsn| {
+            sentry::init((
+                dsn,
+                sentry::ClientOptions {
+                    release: sentry::release_name!(),
+                    traces_sample_rate: if config.environment == "production" { 0.1 } else { 1.0 },
+                    ..Default::default()
+                },
+            ))
+        });
+
+    // Initialize Sentry if DSN is configured
+    let _sentry_guard = std::env::var("SENTRY_DSN")
+        .ok()
+        .map(|dsn| {
+            sentry::init((
+                dsn,
+                sentry::ClientOptions {
+                    release: sentry::release_name!(),
+                    traces_sample_rate: if config.environment == "production" { 0.1 } else { 1.0 },
+                    ..Default::default()
+                },
+            ))
+        });
     let bind_addr = format!("0.0.0.0:{}", config.port);
 
     // Initialize Turso/libSQL database

@@ -1,7 +1,10 @@
 <script lang="ts">
+	import { createEventDispatcher } from 'svelte';
 	import { locale } from '$stores/locale';
 	import { settings, type UserSettings } from '$stores/settings';
 	import { Sun, Moon, Save } from 'lucide-svelte';
+
+	const dispatch = createEventDispatcher();
 
 	let formValues: UserSettings = { ...$settings };
 	let saving = false;
@@ -13,6 +16,7 @@
 		saving = true;
 		saved = false;
 		settings.set(formValues);
+		dispatch('save', formValues);
 		saving = false;
 		saved = true;
 		setTimeout(() => (saved = false), 2000);

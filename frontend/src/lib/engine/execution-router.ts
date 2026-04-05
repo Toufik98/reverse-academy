@@ -234,14 +234,13 @@ async function executePython(code: string, timeout: number): Promise<ExecutionRe
 	}
 }
 
-async function executeSQL(_code: string, _timeout: number): Promise<ExecutionResult> {
-	// TODO: Implement sql.js WASM execution
-	return {
-		success: false,
-		output: '',
-		error: 'SQL execution coming in v1.1',
-		tier: 'browser'
-	};
+async function executeSQL(code: string, timeout: number): Promise<ExecutionResult> {
+	try {
+		const { executeSQL: runSql } = await import('../workers/sql-executor');
+		return runSql(code, timeout);
+	} catch (err: any) {
+		return { success: false, output: '', error: err.message, tier: 'browser' };
+	}
 }
 
 // ─── Tier 2: Backend Execution ───────────────────────────────────

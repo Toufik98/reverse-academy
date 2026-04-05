@@ -203,20 +203,24 @@ async fn evaluate_criteria(conn: &libsql::Connection, user_id: &str, criteria_js
 
     match criteria_type {
         "step_count" => {
-            let _step_type = criteria
+            let step_type = criteria
                 .get("stepType")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             let count = criteria.get("count").and_then(|v| v.as_i64()).unwrap_or(1);
 
-            // Count completed steps of given type
-            // This is simplified — real implementation would join with steps table
-            let result = conn
-                .query(
-                    "SELECT COUNT(*) FROM user_progress WHERE user_id = ?1 AND status = 'completed'",
-                    [user_id],
-                )
-                .await;
+            // Count completed steps, optionally filtered by step type
+            let query = if step_type.is_empty() {
+                "SELECT COUNT(*) FROM user_progress WHERE user_id = ?1 AND status = 'completed'".to_string()
+            } else {
+                "SELECT COUNT(*) FROM user_progress up JOIN steps s ON up.step_id = s.id WHERE up.user_id = ?1 AND up.status = 'completed' AND s.step_type = ?2".to_string()
+            };
+
+            let result = if step_type.is_empty() {
+                conn.query(&query, [user_id]).await
+            } else {
+                conn.query(&query, [user_id, step_type]).await
+            };
 
             if let Ok(mut rows) = result {
                 if let Ok(Some(row)) = rows.next().await {
@@ -227,8 +231,31 @@ async fn evaluate_criteria(conn: &libsql::Connection, user_id: &str, criteria_js
             false
         }
         "path_complete" => {
-            let _count = criteria.get("count").and_then(|v| v.as_i64()).unwrap_or(1);
-            // TODO: Check if user has completed at least `count` paths
+            let count = criteria.get("count").and_then(|v| v.as_i64()).unwrap_or(1);
+
+            // Count distinct paths where all steps are completed
+            let result = conn
+                .query(
+                    "SELECT COUNT(DISTINCT path_id) FROM (
+                        SELECT up.path_id
+                        FROM user_progress up
+                        JOIN steps s ON up.step_id = s.id
+                        WHERE up.user_id = ?1 AND up.status = 'completed'
+                        GROUP BY up.path_id
+                        HAVING COUNT(DISTINCT up.step_id) = (
+                            SELECT COUNT(*) FROM steps s2 WHERE s2.path_id = up.path_id
+                        )
+                    )",
+                    [user_id],
+                )
+                .await;
+
+            if let Ok(mut rows) = result {
+                if let Ok(Some(row)) = rows.next().await {
+                    let actual: i64 = row.get(0).unwrap_or(0);
+                    return actual >= count;
+                }
+            }
             false
         }
         "first_attempt" => {

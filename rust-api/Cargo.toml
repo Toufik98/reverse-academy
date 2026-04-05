@@ -26,6 +26,7 @@ rand = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
 tempfile = "3"
+sentry = { version = "0.34", features = ["tracing"] }
 
 [profile.release]
 opt-level = 3
