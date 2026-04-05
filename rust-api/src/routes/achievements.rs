@@ -211,7 +211,8 @@ async fn evaluate_criteria(conn: &libsql::Connection, user_id: &str, criteria_js
 
             // Count completed steps, optionally filtered by step type
             let query = if step_type.is_empty() {
-                "SELECT COUNT(*) FROM user_progress WHERE user_id = ?1 AND status = 'completed'".to_string()
+                "SELECT COUNT(*) FROM user_progress WHERE user_id = ?1 AND status = 'completed'"
+                    .to_string()
             } else {
                 "SELECT COUNT(*) FROM user_progress up JOIN steps s ON up.step_id = s.id WHERE up.user_id = ?1 AND up.status = 'completed' AND s.step_type = ?2".to_string()
             };

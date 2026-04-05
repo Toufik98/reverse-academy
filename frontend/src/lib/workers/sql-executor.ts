@@ -4,27 +4,19 @@
  * Lazy-loads ~1.5MB WASM bundle on first SQL challenge.
  * Uses an in-memory database pre-seeded with challenge data.
  */
-import initSqlJs, { type Database } from 'sql.js';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+import initSqlJs from 'sql.js';
 
-let sqlPromise: Promise<typeof import('sql.js')> | null = null;
-let db: Database | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let SQL: any = null;
 
-async function ensureSqlJs(): Promise<typeof import('sql.js')> {
-	if (!sqlPromise) {
-		sqlPromise = initSqlJs({
+async function ensureSqlJs() {
+	if (!SQL) {
+		SQL = await initSqlJs({
 			locateFile: (file: string) => `/pyodide/${file}`
 		});
 	}
-	return sqlPromise;
-}
-
-function getDb(): Database {
-	if (!db) {
-		const SQL = sqlPromise ? undefined : undefined;
-		void SQL;
-		db = new (initSqlJs as any)();
-	}
-	return db;
+	return SQL;
 }
 
 export async function executeSQL(
@@ -36,8 +28,8 @@ export async function executeSQL(
 			throw new Error('SQL execution timeout');
 		}, timeout);
 
-		const SQL = await ensureSqlJs();
-		const database = new SQL.Database();
+		const SqlJs = await ensureSqlJs();
+		const database = new SqlJs.Database();
 
 		try {
 			database.run(code);
@@ -48,7 +40,9 @@ export async function executeSQL(
 			if (lastResult.length > 0) {
 				const columns = database.getColumnNames();
 				const headerRow = columns.join(' | ');
-				const separator = columns.map((c: string) => '-'.repeat(Math.max(c.length, 3))).join('-+-');
+				const separator = columns
+					.map((c: string) => '-'.repeat(Math.max(c.length, 3)))
+					.join('-+-');
 				const dataRows = lastResult.map((row: string[]) =>
 					row.map((cell: string) => String(cell ?? 'NULL')).join(' | ')
 				);
