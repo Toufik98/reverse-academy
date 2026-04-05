@@ -3,7 +3,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
@@ -310,9 +310,22 @@ async fn main() {
         .layer(TraceLayer::new_for_http())
         .layer(
             CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any),
+                .allow_origin([
+                    config.frontend_url.parse().expect("Invalid FRONTEND_URL"),
+                    "http://localhost:5173".parse().unwrap(),
+                    "http://localhost:3000".parse().unwrap(),
+                ])
+                .allow_methods([
+                    axum::http::Method::GET,
+                    axum::http::Method::POST,
+                    axum::http::Method::PATCH,
+                    axum::http::Method::DELETE,
+                ])
+                .allow_headers([
+                    axum::http::header::CONTENT_TYPE,
+                    axum::http::header::AUTHORIZATION,
+                ])
+                .allow_credentials(true),
         )
         .with_state(shared_state);
 
